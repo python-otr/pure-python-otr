@@ -169,15 +169,29 @@ class Context(object):
 
         if isinstance(message, proto.Query):
             self.handleQuery(message)
-            return (message.msg, []) \
-                    if isinstance(message, proto.TaggedPlaintext) else IGN
+
+            if isinstance(message, Proto.TaggedPlaintext):
+                # it's actually a plaintext message
+                if self.state != STATE_PLAINTEXT or \
+                        self.getPolicy('REQUIRE_ENCRYPTION'):
+                    # but we don't want plaintexts
+                    raise UnencryptedMessage(message.msg)
+
+                return (message.msg, [])
+
+            return IGN
+
         if isinstance(message, proto.AKEMessage):
             self.crypto.handleAKE(message)
             return IGN
+
         if isinstance(message, proto.DataMessage):
             ignore = message.flags & proto.MSGFLAGS_IGNORE_UNREADABLE
 
             if self.state != STATE_ENCRYPTED:
+                self.sendInternal(proto.Error(
+                        'You sent encrypted to {}, who wasn\'t expecting it.'
+                            .format(self.user.name)))
                 if ignore:
                     return IGN
                 raise NotEncryptedError(EXC_UNREADABLE_MESSAGE)
@@ -186,9 +200,7 @@ class Context(object):
                 plaintext, tlvs = self.crypto.handleDataMessage(message)
                 self.processTLVs(tlvs)
                 if plaintext and self.lastSend < time() - HEARTBEAT_INTERVAL:
-                    self.lastSend = time()
-                    self.sendMessage(FRAGMENT_SEND_ALL, '',
-                            flags=proto.MSGFLAGS_IGNORE_UNREADABLE)
+                    self.sendInternal('')
                 return plaintext or None, tlvs
             except crypt.InvalidParameterError, e:
                 if ignore:
@@ -199,13 +211,22 @@ class Context(object):
             if self.state != STATE_PLAINTEXT or \
                     self.getPolicy('REQUIRE_ENCRYPTION'):
                 raise UnencryptedMessage(message)
-        # TODO handle ERROR
+
+        if isinstance(message, proto.Error):
+            raise ErrorReceived(message)
 
         return message, None
 
+    def sendInternal(self, msg):
+        if isinstance(msg, basestring):
+            self.sendMessage(FRAGMENT_SEND_ALL, msg,
+                    flags=proto.MSGFLAGS_IGNORE_UNREADABLE)
+        else:
+            self.sendFragmented(FRAGMENT_SEND_ALL, str(msg))
 
     def sendMessage(self, sendPolicy, msg, flags=0):
         if self.policyOtrEnabled():
+            self.lastSend = time()
             msg = str(self.processOutgoingMessage(msg, flags))
         return self.sendFragmented(sendPolicy, msg)
 
@@ -347,4 +368,6 @@ class Context(object):
 class NotEncryptedError(RuntimeError):
     pass
 class UnencryptedMessage(RuntimeError):
+    pass
+class ErrorReceived(RuntimeError):
     pass
