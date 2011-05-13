@@ -94,6 +94,7 @@ class Query(OTRMessage):
         if self.v2:
             d += '2'
         d += '?'
+        return d
 
 class TaggedPlaintext(Query):
     __slots__ = ['msg']
