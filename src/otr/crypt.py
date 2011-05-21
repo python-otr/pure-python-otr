@@ -50,7 +50,7 @@ def SHA256HMAC(key, data):
 def SHA256HMAC160(key, data):
     return SHA256HMAC(key, data)[:20]
 
-def human_hash(fp)
+def human_hash(fp):
     fplen = len(fp)
     wordsize = fplen/5
     buf = ''
