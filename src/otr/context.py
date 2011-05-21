@@ -9,15 +9,6 @@ import proto
 
 from time import time
 
-policy = {
-            'ALLOW_V1':False,
-            'ALLOW_V2':True,
-            'REQUIRE_ENCRYPTION':False,
-            'SEND_TAG':True,
-            'WHITESPACE_START_AKE':True,
-            'ERROR_START_AKE':True,
-        }
-
 EXC_UNREADABLE_MESSAGE = 1
 EXC_FINISHED = 2
 
@@ -102,6 +93,10 @@ class Context(object):
             return assembled
 
         return None
+
+    def removeFingerprint(self, fingerprint):
+        if fingerprint in self.trust:
+            del self.trust[fingerprint]
 
     def setTrust(self, fingerprint, trustLevel):
         ''' sets the trust level for the given fingerprint.
