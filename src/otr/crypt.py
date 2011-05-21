@@ -50,6 +50,14 @@ def SHA256HMAC(key, data):
 def SHA256HMAC160(key, data):
     return SHA256HMAC(key, data)[:20]
 
+def human_hash(fp)
+    fplen = len(fp)
+    wordsize = fplen/5
+    buf = ''
+    for w in range(0, fplen, wordsize):
+        buf += '{} '.format(fp[w:w+wordsize])
+    return buf.rstrip()
+
 class Counter(object):
     __slots__ = ['prefix', 'val']
     def __init__(self, prefix):
@@ -125,6 +133,9 @@ class PK(object):
     def serializePublicKey(self):
         raise NotImplementedError
 
+    def cfingerprint(self):
+        return '{:02x}'.format(bytes_to_long(self.fingerprint()))
+
     @staticmethod
     def parse(data):
         typeid, data = proto.unpack('!H', data)
@@ -135,13 +146,7 @@ class PK(object):
         return cls.parsePayload(data)
 
     def __str__(self):
-        fp = self.fingerprint()
-        fplen = len(fp)
-        wordsize = fplen/4
-        buf = ''
-        for w in range(0, fplen, wordsize):
-            buf += '{:02X} '.format(bytes_to_long(fp[w:w+wordsize]))
-        return buf.rstrip()
+        return human_hash(self.cfingerprint())
     def __repr__(self):
         return '<{cls}(fpr=\'{fpr}\')>'.format(
                 cls=self.__class__.__name__, fpr=str(self))
@@ -151,24 +156,23 @@ class DSAKey(PK):
     __slots__ = ['priv', 'pub']
     pubkeyType = 0x0000
 
-    def __init__(self, priv=None, pub=None):
-        if pub is None:
-            if isinstance(priv, tuple) and len(priv) == 5:
-                self.priv = DSA.construct(priv)
-            elif isinstance(priv, DSA._DSAobj):
-                self.priv = priv
+    def __init__(self, key=None):
+        self.priv = self.pub = None
+        if isinstance(key, tuple):
+            if len(key) == 5:
+                self.priv = DSA.construct(key)
+                self.pub = self.priv.publickey()
+            if len(key) == 4:
+                self.pub = DSA.construct(key)
+        elif isinstance(key, DSA._DSAobj):
+            if key.has_private():
+                self.priv = key
+                self.pub = self.priv.publickey()
             else:
-                raise TypeError('None, DSA object or 5-tuple required for privkey')
-            self.pub = self.priv.publickey()
-        elif priv is None:
-            if isinstance(pub, tuple) and len(pub) == 4:
-                self.pub = DSA.construct(pub)
-            elif isinstance(pub, DSA._DSAobj):
-                self.pub = pub
-            else:
-                raise TypeError('None, DSA object or 4-tuple required for pubkey')
-        else:
-            raise TypeError('privkey or pubkey must be None')
+                self.pub = key
+
+        if self.priv is None and self.pub is None:
+            raise TypeError('DSA object or 4/5-tuple required for key')
 
     def serializePublicKey(self):
         return struct.pack('!H', self.pubkeyType) + \
@@ -202,9 +206,15 @@ class DSAKey(PK):
     def __ne__(self, other):
         return not (self == other)
 
+    def __getstate__(self):
+        if self.priv is not None:
+            return (self.priv.y, self.priv.g, self.priv.p, self.priv.q,
+                    self.priv.x)
+        else:
+            return (self.priv.y, self.priv.g, self.priv.p, self.priv.q)
+
     def __setstate__(self, d):
-        for k,v in d.iteritems():
-            setattr(self, k, v)
+        self.__init__(d)
 
     @classmethod
     def generate(cls):
@@ -218,7 +228,7 @@ class DSAKey(PK):
         q, data = fromMpi(data)
         g, data = fromMpi(data)
         y, data = fromMpi(data)
-        return cls(pub=(y, g, p, q)), data
+        return cls((y, g, p, q)), data
 
 class DHSession(object):
     __slots__ = ['sendenc', 'sendmac', 'rcvenc', 'rcvmac', 'sendctr', 'rcvctr',
@@ -364,11 +374,11 @@ class CryptEngine(object):
 
         return plaintext, tlvs
 
-    def smpHandle(self, tlv):
+    def smpHandle(self, tlv, appdata=None):
         if self.smp is None:
             logging.debug('Creating SMPHandler')
             self.smp = SMPHandler(self)
-        self.smp.handle(tlv)
+        self.smp.handle(tlv, appdata=appdata)
 
     def createDataMessage(self, message, flags=0, tlvs=[]):
         # check MSGSTATE
@@ -401,12 +411,12 @@ class CryptEngine(object):
             return False
         return True
 
-    def startAKE(self):
+    def startAKE(self, appdata=None):
         self.ake = AuthKeyExchange(self.ctx.user.getPrivkey(), self.goEncrypted)
         outMsg = self.ake.startAKE()
-        self.ctx.inject(outMsg)
+        self.ctx.inject(outMsg, appdata=appdata)
 
-    def handleAKE(self, inMsg):
+    def handleAKE(self, inMsg, appdata=None):
         outMsg = None
 
         if not self.ctx.getPolicy('ALLOW_V2'):
@@ -434,7 +444,7 @@ class CryptEngine(object):
             self.ake.handleSignature(inMsg)
 
         if outMsg is not None:
-            self.ctx.inject(outMsg)
+            self.ctx.inject(outMsg, appdata=appdata)
 
     def goEncrypted(self, ake):
         if ake.dh.pub == ake.gy:
@@ -457,8 +467,7 @@ class CryptEngine(object):
             self.sessionkeys[0][0] = DHSession.create(self.ourDHKey, self.theirY)
             self.rotateDHKeys()
 
-        # TODO handle refresh
-        self.ctx.state = context.STATE_ENCRYPTED
+        self.ctx.setState(context.STATE_ENCRYPTED)
         logging.info('went encrypted with {}'.format(self.theirPubkey))
 
     def finished(self):
@@ -654,22 +663,24 @@ class SMPHandler:
         self.p = None
         self.q = None
 
-    def abort(self):
+    def abort(self, appdata=None):
         self.state = 1
-        self.sendTLV(proto.SMPABORTTLV())
+        self.sendTLV(proto.SMPABORTTLV(), appdata=appdata)
+        self.crypto.ctx.setCurrentTrust('')
 
-    def sendTLV(self, tlv):
+    def sendTLV(self, tlv, appdata=None):
         self.crypto.ctx.inject(self.crypto.createDataMessage('',
-                flags=proto.MSGFLAGS_IGNORE_UNREADABLE, tlvs=[tlv]))
+                flags=proto.MSGFLAGS_IGNORE_UNREADABLE, tlvs=[tlv]),
+                appdata=appdata)
 
-    def handle(self, tlv):
+    def handle(self, tlv, appdata=None):
         logging.debug('handling TLV {0.__class__.__name__}'.format(tlv))
         if isinstance(tlv, proto.SMPABORTTLV):
             self.state = 1
             return
         if isinstance(tlv, proto.SMP1TLV):
             if self.state != 1:
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             self.prog = SMPPROG_CHEATED
@@ -680,7 +691,7 @@ class SMPHandler:
                     or not check_known_log(msg[1], msg[2], self.g1, msg[0], 1) \
                     or not check_known_log(msg[4], msg[5], self.g1, msg[3], 2):
                 logging.error('invalid SMP1TLV received')
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             self.g3o = msg[3]
@@ -696,7 +707,7 @@ class SMPHandler:
             return
         if isinstance(tlv, proto.SMP2TLV):
             if self.state != 2:
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             self.prog = SMPPROG_CHEATED
@@ -711,7 +722,7 @@ class SMPHandler:
                     or not check_known_log(msg[1], msg[2], self.g1, msg[0], 3) \
                     or not check_known_log(msg[4], msg[5], self.g1, msg[3], 4):
                 logging.error('invalid SMP2TLV received')
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             self.g3o = msg[3]
@@ -720,7 +731,7 @@ class SMPHandler:
 
             if not self.check_equal_coords(msg[6:11], 5):
                 logging.error('invalid SMP2TLV received')
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             r = bytes_to_long(RNG.read(192))
@@ -741,11 +752,11 @@ class SMPHandler:
             msg += self.proof_equal_logs(7)
 
             self.state = 4
-            self.sendTLV(proto.SMP3TLV(msg))
+            self.sendTLV(proto.SMP3TLV(msg), appdata=appdata)
             return
         if isinstance(tlv, proto.SMP3TLV):
             if self.state != 3:
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             self.prog = SMPPROG_CHEATED
@@ -756,7 +767,7 @@ class SMPHandler:
                     or not check_exp(msg[4]) or not check_exp(msg[7]) \
                     or not self.check_equal_coords(msg[:5], 6):
                 logging.error('invalid SMP3TLV received')
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             inv = invMod(self.p)
@@ -766,7 +777,7 @@ class SMPHandler:
 
             if not self.check_equal_logs(msg[5:8], 7):
                 logging.error('invalid SMP3TLV received')
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             md = msg[5]
@@ -778,17 +789,17 @@ class SMPHandler:
 
             if self.prog != SMPPROG_SUCCEEDED:
                 logging.error('secrets don\'t match')
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             logging.info('secrets matched')
-            # TODO set trust
+            self.crypto.ctx.setCurrentTrust('smp')
             self.state = 1
-            self.sendTLV(proto.SMP4TLV(msg))
+            self.sendTLV(proto.SMP4TLV(msg), appdata=appdata)
             return
         if isinstance(tlv, proto.SMP4TLV):
             if self.state != 4:
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             self.prog = SMPPROG_CHEATED
@@ -797,7 +808,7 @@ class SMPHandler:
             if not check_group(msg[0]) or not check_exp(msg[2]) \
                     or not self.check_equal_logs(msg[:3], 8):
                 logging.error('invalid SMP4TLV received')
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             rab = pow(msg[0], self.x3, DH1536_MODULUS)
@@ -806,15 +817,15 @@ class SMPHandler:
 
             if self.prog != SMPPROG_SUCCEEDED:
                 logging.error('secrets don\'t match')
-                self.abort()
+                self.abort(appdata=appdata)
                 return
 
             logging.info('secrets matched')
-            # TODO set trust
+            self.crypto.ctx.setCurrentTrust('smp')
             self.state = 1
             return
 
-    def gotSecret(self, secret):
+    def gotSecret(self, secret, appdata=None):
         ourFP = self.crypto.ctx.user.getPrivkey().fingerprint()
         if self.state == 1:
             # first secret -> SMP1TLV
@@ -834,7 +845,7 @@ class SMPHandler:
 
             self.prog = SMPPROG_OK
             self.state = 2
-            self.sendTLV(proto.SMP1TLV(msg))
+            self.sendTLV(proto.SMP1TLV(msg), appdata=appdata)
         if self.state == 0:
             # response secret -> SMP2TLV
             combSecret = SHA256('\1' + self.crypto.theirPubkey.fingerprint() +
@@ -860,7 +871,7 @@ class SMPHandler:
             msg += self.proof_equal_coords(r, 5)
 
             self.state = 3
-            self.sendTLV(proto.SMP2TLV(msg))
+            self.sendTLV(proto.SMP2TLV(msg), appdata=appdata)
 
     def proof_equal_coords(self, r, v):
         r1 = bytes_to_long(RNG.read(192))
