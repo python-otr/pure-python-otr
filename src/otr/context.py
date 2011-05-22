@@ -28,7 +28,7 @@ OFFER_ACCEPTED = 3
 class Context(object):
     __slots__ = ['user', 'policy', 'crypto', 'tagOffer', 'lastSend',
             'lastMessage', 'mayRetransmit', 'fragment', 'fragmentInfo', 'state',
-            'inject', 'trust']
+            'inject', 'trust', 'peer']
 
     def __init__(self, account, peername):
         self.user = account
@@ -47,7 +47,7 @@ class Context(object):
         raise NotImplementedError
 
     def policyOtrEnabled(self):
-        return self.getPolicy('ALLOW_V1') or self.getPolicy('ALLOW_V2')
+        return self.getPolicy('ALLOW_V2') or self.getPolicy('ALLOW_V1')
 
     def discardFragment(self):
         self.fragmentInfo = (0, 0)
@@ -106,6 +106,9 @@ class Context(object):
             - 'smp' for smp-style verified keys '''
         self.trust[fingerprint] = trustLevel
 
+    def getTrust(self, fingerprint):
+        return self.trust.get(fingerprint, None)
+
     def setCurrentTrust(self, trustLevel):
         self.setTrust(self.crypto.theirPubkey.cfingerprint(), trustLevel)
         self.user.saveTrusts()
@@ -119,6 +122,8 @@ class Context(object):
             - None if the key is unknown yet
             - a non-empty string if the key is trusted
             - an empty string if the key is untrusted '''
+        if self.crypto.theirPubkey is None:
+            return None
         return self.trust.get(self.crypto.theirPubkey.cfingerprint(), None)
 
     def receiveMessage(self, messageData, appdata=None):
@@ -289,6 +294,23 @@ class Context(object):
                 self.crypto.smpHandle(tlv, appdata=appdata)
                 continue
             logging.info('got unhandled tlv: {!r}'.format(tlv))
+
+    def smpAbort(self, appdata=None):
+        self.crypto.smpAbort(appdata=appdata)
+
+    def smpIsValid(self):
+        return self.crypto.smp and self.crypto.smp.prog != crypt.SMPPROG_CHEATED
+
+    def smpIsSuccess(self):
+        return self.crypto.smp.prog == crypt.SMPPROG_SUCCEEDED \
+                if self.crypto.smp else None
+
+    def smpGotSecret(self, secret, question=None, appdata=None):
+        self.crypto.smpSecret(secret, question=question, appdata=appdata)
+
+    def smpInit(self, secret, question=None, appdata=None):
+        self.crypto.smp = None
+        self.crypto.smpSecret(secret, question=question, appdata=appdata)
 
     def handleQuery(self, message, appdata=None):
         if message.v2 and self.getPolicy('ALLOW_V2'):

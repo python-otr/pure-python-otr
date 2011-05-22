@@ -375,11 +375,24 @@ class CryptEngine(object):
 
         return plaintext, tlvs
 
+    def smpSecret(self, secret, question=None, appdata=None):
+        if self.smp is None:
+            logging.debug('Creating SMPHandler')
+            self.smp = SMPHandler(self)
+
+        self.smp.gotSecret(secret, question=question, appdata=appdata)
+
     def smpHandle(self, tlv, appdata=None):
         if self.smp is None:
             logging.debug('Creating SMPHandler')
             self.smp = SMPHandler(self)
         self.smp.handle(tlv, appdata=appdata)
+
+    def smpAbort(self, appdata=None):
+        if self.smp is None:
+            logging.debug('Creating SMPHandler')
+            self.smp = SMPHandler(self)
+        self.smp.abort(appdata=appdata)
 
     def createDataMessage(self, message, flags=0, tlvs=[]):
         # check MSGSTATE
@@ -667,7 +680,6 @@ class SMPHandler:
     def abort(self, appdata=None):
         self.state = 1
         self.sendTLV(proto.SMPABORTTLV(), appdata=appdata)
-        self.crypto.ctx.setCurrentTrust('')
 
     def sendTLV(self, tlv, appdata=None):
         self.crypto.ctx.inject(self.crypto.createDataMessage('',
@@ -676,15 +688,15 @@ class SMPHandler:
 
     def handle(self, tlv, appdata=None):
         logging.debug('handling TLV {0.__class__.__name__}'.format(tlv))
+        self.prog = SMPPROG_CHEATED
         if isinstance(tlv, proto.SMPABORTTLV):
             self.state = 1
             return
-        if isinstance(tlv, proto.SMP1TLV):
+        if isinstance(tlv, (proto.SMP1TLV, proto.SMP1QTLV)):
             if self.state != 1:
                 self.abort(appdata=appdata)
                 return
 
-            self.prog = SMPPROG_CHEATED
             msg = tlv.mpis
 
             if not check_group(msg[0]) or not check_group(msg[3]) \
@@ -711,7 +723,6 @@ class SMPHandler:
                 self.abort(appdata=appdata)
                 return
 
-            self.prog = SMPPROG_CHEATED
             msg = tlv.mpis
             mp = msg[6]
             mq = msg[7]
@@ -753,6 +764,7 @@ class SMPHandler:
             msg += self.proof_equal_logs(7)
 
             self.state = 4
+            self.prog = SMPPROG_OK
             self.sendTLV(proto.SMP3TLV(msg), appdata=appdata)
             return
         if isinstance(tlv, proto.SMP3TLV):
@@ -760,7 +772,6 @@ class SMPHandler:
                 self.abort(appdata=appdata)
                 return
 
-            self.prog = SMPPROG_CHEATED
             msg = tlv.mpis
 
             if not check_group(msg[0]) or not check_group(msg[1]) \
@@ -791,6 +802,7 @@ class SMPHandler:
             if self.prog != SMPPROG_SUCCEEDED:
                 logging.error('secrets don\'t match')
                 self.abort(appdata=appdata)
+                self.crypto.ctx.setCurrentTrust('')
                 return
 
             logging.info('secrets matched')
@@ -803,7 +815,6 @@ class SMPHandler:
                 self.abort(appdata=appdata)
                 return
 
-            self.prog = SMPPROG_CHEATED
             msg = tlv.mpis
 
             if not check_group(msg[0]) or not check_exp(msg[2]) \
@@ -819,6 +830,7 @@ class SMPHandler:
             if self.prog != SMPPROG_SUCCEEDED:
                 logging.error('secrets don\'t match')
                 self.abort(appdata=appdata)
+                self.crypto.ctx.setCurrentTrust('')
                 return
 
             logging.info('secrets matched')
@@ -826,7 +838,7 @@ class SMPHandler:
             self.state = 1
             return
 
-    def gotSecret(self, secret, appdata=None):
+    def gotSecret(self, secret, question=None, appdata=None):
         ourFP = self.crypto.ctx.user.getPrivkey().fingerprint()
         if self.state == 1:
             # first secret -> SMP1TLV
@@ -846,7 +858,10 @@ class SMPHandler:
 
             self.prog = SMPPROG_OK
             self.state = 2
-            self.sendTLV(proto.SMP1TLV(msg), appdata=appdata)
+            if question is None:
+                self.sendTLV(proto.SMP1TLV(msg), appdata=appdata)
+            else:
+                self.sendTLV(proto.SMP1QTLV(question, msg), appdata=appdata)
         if self.state == 0:
             # response secret -> SMP2TLV
             combSecret = SHA256('\1' + self.crypto.theirPubkey.fingerprint() +

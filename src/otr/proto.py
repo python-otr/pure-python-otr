@@ -61,7 +61,8 @@ class Error(OTRMessage):
     def __repr__(self):
         return '<proto.Error(%r)>' % self.error
 
-    __str__ = __repr__
+    def __str__(self):
+        return '?OTR Error:%s' % self.error
 
 class Query(OTRMessage):
     __slots__ = ['v1', 'v2']
