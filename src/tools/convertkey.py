@@ -1,7 +1,7 @@
 #!/usr/bin/python2
 
 import pickle
-from otr.crypt import DSAKey
+from potr.crypt import DSAKey
 
 def parse(tokens):
     key = tokens.pop(0)[1:]
