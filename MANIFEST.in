@@ -1,0 +1,2 @@
+include LICENSE CHANGELOG
+recursive-include src/tools *.py
