@@ -185,8 +185,8 @@ class Context(object):
 
             if self.state != STATE_ENCRYPTED:
                 self.sendInternal(proto.Error(
-                        'You sent encrypted to {}, who wasn\'t expecting it.'
-                            .format(self.user.name)), appdata=appdata)
+                        'You sent encrypted to {user}, who wasn\'t expecting it.'
+                            .format(user=self.user.name)), appdata=appdata)
                 if ignore:
                     return IGN
                 raise NotEncryptedError(EXC_UNREADABLE_MESSAGE)
@@ -276,7 +276,7 @@ class Context(object):
                 raise OverflowError('too many fragments')
 
             for fi in range(len(fragments)):
-                fragments[fi] = '?OTR,{},{},{},'.format(fi+1, fc, fragments[fi])
+                fragments[fi] = '?OTR,{0},{1},{2},'.format(fi+1, fc, fragments[fi])
 
             if sendPolicy == FRAGMENT_SEND_ALL:
                 for f in fragments:
@@ -309,7 +309,7 @@ class Context(object):
             if isinstance(tlv, proto.SMPTLV):
                 self.crypto.smpHandle(tlv, appdata=appdata)
                 continue
-            logging.info('got unhandled tlv: {!r}'.format(tlv))
+            logging.info('got unhandled tlv: {0!r}'.format(tlv))
 
     def smpAbort(self, appdata=None):
         self.crypto.smpAbort(appdata=appdata)
@@ -377,7 +377,8 @@ class Context(object):
             cls = proto.messageClasses.get(classInfo, None)
             if cls is None:
                 return message
-            logging.debug('{} got msg {!r}'.format(self.user.name, cls))
+            logging.debug('{user} got msg {typ!r}' \
+                    .format(user=self.user.name, typ=cls))
             return cls.parsePayload(message[indexBase+5:])
 
         if message[indexBase:indexBase+7] == ' Error:':

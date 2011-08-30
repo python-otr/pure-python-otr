@@ -73,7 +73,7 @@ def human_hash(fp):
     wordsize = fplen/5
     buf = ''
     for w in range(0, fplen, wordsize):
-        buf += '{} '.format(fp[w:w+wordsize])
+        buf += '{0} '.format(fp[w:w+wordsize])
     return buf.rstrip()
 
 class Counter(object):
@@ -92,7 +92,7 @@ class Counter(object):
         super(Counter, self).__setattr__(attr, val)
 
     def __repr__(self):
-        return '<Counter(p={!r},v={!r})>'.format(self.prefix, self.val)
+        return '<Counter(p={p!r},v={v!r})>'.format(p=self.prefix, v=self.val)
 
     def byteprefix(self):
         return long_to_bytes(self.prefix).rjust(8, '\0')
@@ -152,7 +152,7 @@ class PK(object):
         raise NotImplementedError
 
     def cfingerprint(self):
-        return '{:02x}'.format(bytes_to_long(self.fingerprint()))
+        return '{0:02x}'.format(bytes_to_long(self.fingerprint()))
 
     @staticmethod
     def parse(data):
@@ -262,8 +262,9 @@ class DHSession(object):
         self.rcvmacused = False
 
     def __repr__(self):
-        return '<{}(send={!r},rcv={!r})>'.format(self.__class__.__name__,
-                self.sendmac, self.rcvmac)
+        return '<{cls}(send={s!r},rcv={r!r})>' \
+                .format(cls=self.__class__.__name__,
+                        s=self.sendmac, r=self.rcvmac)
 
     @classmethod
     def create(cls, dh, y):
@@ -331,7 +332,7 @@ class CryptEngine(object):
         self.sessionkeys[0][1] = None if self.theirOldY is None else \
                 DHSession.create(self.ourDHKey, self.theirOldY)
 
-        logging.debug('{}: Refreshing ourkey to {} {}'.format(
+        logging.debug('{0}: Refreshing ourkey to {1} {2}'.format(
                 self.ctx.user.name, self.ourKeyid, self.sessionkeys))
 
     def rotateYKeys(self, new_y):
@@ -345,7 +346,7 @@ class CryptEngine(object):
         self.sessionkeys[0][0] = DHSession.create(self.ourDHKey, self.theirY)
         self.sessionkeys[1][0] = DHSession.create(self.ourOldDHKey, self.theirY)
 
-        logging.debug('{}: Refreshing theirkey to {} {}'.format(
+        logging.debug('{0}: Refreshing theirkey to {1} {2}'.format(
                 self.ctx.user.name, self.theirKeyid, self.sessionkeys))
 
     def handleDataMessage(self, msg):
@@ -355,9 +356,9 @@ class CryptEngine(object):
         sesskey = self.sessionkeys[self.ourKeyid - msg.rkeyid] \
                 [self.theirKeyid - msg.skeyid]
 
-        logging.debug('sesskeys: {!r}, our={}, r={}, their={}, s={}'.format(
-                self.sessionkeys, self.ourKeyid, msg.rkeyid, self.theirKeyid,
-                msg.skeyid))
+        logging.debug('sesskeys: {0!r}, our={1}, r={2}, their={3}, s={4}' \
+                .format(self.sessionkeys, self.ourKeyid, msg.rkeyid,
+                        self.theirKeyid, msg.skeyid))
 
         if msg.mac != SHA1HMAC(sesskey.rcvmac, msg.getMacedData()):
             logging.error('HMACs don\'t match')
@@ -372,8 +373,8 @@ class CryptEngine(object):
 
         sesskey.rcvctr.prefix = newCtrPrefix
 
-        logging.debug('handle: enc={!r} mac={!r} ctr={!r}'.format(
-                sesskey.rcvenc, sesskey.rcvmac, sesskey.rcvctr))
+        logging.debug('handle: enc={0!r} mac={1!r} ctr={2!r}' \
+                .format(sesskey.rcvenc, sesskey.rcvmac, sesskey.rcvctr))
 
         plaintextData = AESCTR(sesskey.rcvenc, sesskey.rcvctr) \
                 .decrypt(msg.encmsg)
@@ -419,8 +420,8 @@ class CryptEngine(object):
         sess = self.sessionkeys[1][0]
         sess.sendctr.inc()
 
-        logging.debug('create: enc={!r} mac={!r} ctr={!r}'.format(
-                sess.sendenc, sess.sendmac, sess.sendctr))
+        logging.debug('create: enc={0!r} mac={1!r} ctr={2!r}' \
+                .format(sess.sendenc, sess.sendmac, sess.sendctr))
 
         # plaintext + TLVS
         plainBuf = message + '\0' + ''.join([ str(t) for t in tlvs])
@@ -499,7 +500,7 @@ class CryptEngine(object):
             self.rotateDHKeys()
 
         self.ctx.setState(context.STATE_ENCRYPTED)
-        logging.info('went encrypted with {}'.format(self.theirPubkey))
+        logging.info('went encrypted with {0}'.format(self.theirPubkey))
 
     def finished(self):
         self.smp = None
