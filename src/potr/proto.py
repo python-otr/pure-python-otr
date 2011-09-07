@@ -130,15 +130,15 @@ class TaggedPlaintext(Query):
         return data
 
     def __repr__(self):
-        return '<proto.TaggedPlaintext(v1={!r},v2={!r},msg={!r})>' \
-                .format(self.v1, self.v2, self.msg)
+        return '<proto.TaggedPlaintext(v1={v1!r},v2={v2!r},msg={msg!r})>' \
+                .format(v1=self.v1, v2=self.v2, msg=self.msg)
 
     @classmethod
     def parse(cls, data):
         tagPos = data.find(MESSAGE_TAG_BASE)
         if tagPos < 0:
             raise TypeError(
-                    'this is not a tagged plaintext ({.20!r})'.format(data))
+                    'this is not a tagged plaintext ({0.20!r})'.format(data))
 
         v1 = False
         v2 = False
@@ -291,7 +291,7 @@ class DisconnectTLV(TLV):
     @classmethod
     def parsePayload(cls, data):
         if len(data) >  0:
-            raise TypeError('DisconnectTLV must not contain data. got {!r}'
+            raise TypeError('DisconnectTLV must not contain data. got {0!r}'
                     .format(data))
         return cls()
 
@@ -300,7 +300,7 @@ class SMPTLV(TLV):
 
     def __init__(self, mpis=[]):
         if len(mpis) != self.dlen:
-            raise TypeError('expected {} mpis, got {}'
+            raise TypeError('expected {0} mpis, got {1}'
                     .format(self.dlen, count))
         self.mpis = mpis
 
@@ -319,7 +319,7 @@ class SMPTLV(TLV):
                 n, data = read_mpi(data)
                 mpis.append(n)
         if len(data) > 0:
-            raise TypeError('too much data for {} mpis'.format(cls.dlen))
+            raise TypeError('too much data for {0} mpis'.format(cls.dlen))
         return cls(mpis)
 
 @registertlv
