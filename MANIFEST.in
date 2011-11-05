@@ -1,2 +1,3 @@
 include LICENSE CHANGELOG
 recursive-include src/tools *.py
+recursive-include src/gajim-plugin *

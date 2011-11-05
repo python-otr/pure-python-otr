@@ -1,0 +1,9 @@
+This is a Gajim plugin that depends on potr.
+
+This plugin should be installed in a user's home directory:
+
+  ~/.local/share/gajim/plugins/gotr
+
+It must then be enabled in the Gajim plugin interface.
+
+XXX - There is likely a systemwide plugin space - where is it?
