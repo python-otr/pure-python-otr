@@ -1,3 +1,6 @@
+1.0.0beta3 (2011-??-??)
+ - don't always generate a privkey if none available
+
 1.0.0beta2 (2011-08-30)
  - python 2.6 compatibility
 

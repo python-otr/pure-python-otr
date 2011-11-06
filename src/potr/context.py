@@ -404,12 +404,15 @@ class Account(object):
         return '<{cls}(name={name!r})>'.format(cls=self.__class__.__name__,
                 name=self.name)
 
-    def getPrivkey(self):
+    def getPrivkey(self, autogen=True):
         if self.privkey is None:
             self.privkey = self.loadPrivkey()
         if self.privkey is None:
-            self.privkey = crypt.DSAKey.generate()
-            self.savePrivkey()
+            if autogen is True:
+                self.privkey = crypt.DSAKey.generate()
+                self.savePrivkey()
+            else:
+                raise LookupError
         return self.privkey
 
     def loadPrivkey(self):

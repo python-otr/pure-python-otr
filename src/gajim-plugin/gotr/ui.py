@@ -64,10 +64,10 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
             self.flags[flagName] = self.B.get_object(checkBoxName)
 
         self.B.connect_signals(self)
-        self.account_combobox_changed_cb(self.B.get_object('account_combobox'))
 
     def on_run(self):
         self.plugin.update_context_list()
+        self.account_combobox_changed_cb(self.B.get_object('account_combobox'))
 
     def flags_toggled_cb(self, button):
         if button == self.B.get_object('enable_check'):
@@ -106,7 +106,7 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
                 for key, box in self.flags.iteritems():
                     box.set_active(otr_flags[key])
 
-                fpr = str(self.plugin.us[account].getPrivkey())
+                fpr = str(self.plugin.us[account].getPrivkey(autogen=False))
                 regen_button.set_label('Regenerate')
             else:
                 regen_button.set_sensitive(False)
@@ -178,7 +178,12 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
         if active > -1:
             account = self.otr_account_store[active][0]
             button.set_sensitive(False)
-            self.plugin.us[account].dropPrivkey()
+            try:
+                self.plugin.us[account].getPrivkey(autogen=False)
+                self.plugin.us[account].dropPrivkey()
+            except LookupError:
+                pass
+            self.plugin.us[account].getPrivkey(autogen=True)
             self.account_combobox_changed_cb(box, *args)
             button.set_sensitive(True)
 

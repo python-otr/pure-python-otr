@@ -29,7 +29,7 @@ Off-The-Record encryption plugin.
 :license: GPL
 '''
 
-MINVERSION = (1,0,0,'beta1') # 1.0-alpha1
+MINVERSION = (1,0,0,'beta3')
 IGNORE = True
 PASS = False
 
