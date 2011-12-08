@@ -1,3 +1,13 @@
+*.pyc
+*.pyo
 MANIFEST
 dist
 build
+*.bak
+*~
+*.class
+*.egg
+*.EGG
+*.EGG-INFO
+*.lock
+*.swp
