@@ -53,6 +53,20 @@ def registertlv(cls):
     tlvClasses[cls.typ] = cls
     return cls
 
+
+def getslots(cls):
+    ''' helper to collect all the message slots from ancestors '''
+    clss = [cls]
+    
+    for cls in clss:
+        if cls == OTRMessage:
+            continue
+
+        clss.extend(cls.__bases__)
+
+        for slot in cls.__slots__:
+            yield slot
+
 class OTRMessage(object):
     __slots__ = ['payload']
     version = 0x0002
@@ -68,6 +82,17 @@ class OTRMessage(object):
                 + self.getPayload()
         return '?OTR:%s.' % base64.b64encode(data)
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        for slot in getslots(self.__class__):
+            if getattr(self, slot) != getattr(other, slot):
+                return False
+        return True
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
 
 class Error(OTRMessage):
     __slots__ = ['error']
