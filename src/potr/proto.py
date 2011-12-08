@@ -137,7 +137,7 @@ class TaggedPlaintext(Query):
         tagPos = data.find(MESSAGE_TAG_BASE)
         if tagPos < 0:
             raise TypeError(
-                    'this is not a tagged plaintext ({0.20!r})'.format(data))
+                    'this is not a tagged plaintext ({0!r:.20})'.format(data))
 
         v1 = False
         v2 = False
@@ -172,7 +172,7 @@ class GenericOTRMessage(OTRMessage):
         if attr in self.__slots__:
             super(GenericOTRMessage, self).__setattr__(attr, val)
         else:
-            self.__getattr__(attr) # existance check
+            self.__getattr__(attr) # existence check
             self.data[attr] = val
 
     def __repr__(self):
