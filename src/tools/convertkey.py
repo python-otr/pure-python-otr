@@ -47,8 +47,8 @@ def convert(path):
 
     k = oldkey['private-key']['dsa']
     newkey = DSAKey((k['y'],k['g'],k['p'],k['q'],k['x']))
-    print 'Writing converted key for %s/%s to %s' % (oldkey['name'],
-            oldkey['protocol'], path+'2')
+    print('Writing converted key for %s/%s to %s' % (oldkey['name'],
+            oldkey['protocol'], path+'2'))
     with open(path+'2', 'w') as f:
         pickle.dump(newkey, f)
 

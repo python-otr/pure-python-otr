@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #    Copyright 2011 Kjell Braden <afflux@pentabarf.de>
 #
 #    This file is part of the python-potr library.
@@ -16,6 +15,7 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
+import collections
 import base64
 import logging
 import struct
@@ -427,7 +427,7 @@ class Account(object):
     def getContext(self, uid, newCtxCb=None):
         if uid not in self.ctxs:
             self.ctxs[uid] = self.contextclass(self, uid)
-            if callable(newCtxCb):
+            if isinstance(newCtxCb, collections.Callable):
                 newCtxCb(self.ctxs[uid])
         return self.ctxs[uid]
 
