@@ -62,6 +62,9 @@ class Context(object):
     def getPolicy(self, key):
         raise NotImplementedError
 
+    def inject(self, msg, appdata=None):
+        raise NotImplementedError
+
     def policyOtrEnabled(self):
         return self.getPolicy('ALLOW_V2') or self.getPolicy('ALLOW_V1')
 
