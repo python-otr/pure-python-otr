@@ -80,6 +80,7 @@ class ProtoTest(unittest.TestCase):
     def testGenericMsg(self):
         msg = base64.b64encode(proto.pack_data('foo'))
         self.assertEquals('foo', proto.DHKey.parsePayload(msg).gy)
+        self.assertEquals('?OTR:AAIK%s.' % msg, str(proto.DHKey('foo')))
 
         msg = base64.b64encode('\x42\1\3\3\1\x08\6\4\2'
                 + proto.pack_data('foo') + '\0\0\0\0\xde\xad\xbe\xef'
@@ -94,3 +95,28 @@ class ProtoTest(unittest.TestCase):
         self.assertEquals('encoded_dummy', pMsg.encmsg)
         self.assertEquals('this is a dummy mac\0', pMsg.mac)
         self.assertEquals('', pMsg.oldmacs)
+        self.assertEquals('?OTR:AAID%s.' % msg,
+            str(proto.DataMessage(0x42, 0x01030301, 0x08060402, 'foo',
+                '\0\0\0\0\xde\xad\xbe\xef', 'encoded_dummy',
+                'this is a dummy mac\0', '')))
+
+    def testGenericTLV(self):
+        testtlvs = [
+                (proto.DisconnectTLV(), '\0\1\0\0'),
+                (proto.SMP1TLV([1, 2, 3, 4, 5, 6]),
+                    '\0\2\0\x22\0\0\0\6\0\0\0\1\1\0\0\0\1\2\0\0\0\1\3\0\0\0\1\4\0\0\0\1\5\0\0\0\1\6'),
+                (proto.SMPABORTTLV(), '\0\6\0\0')
+                ]
+
+        for tlv, data in testtlvs:
+            self.assertEquals(tlv, proto.TLV.parse(data)[0])
+            self.assertEquals(data, str(data))
+
+        tlvs, datas = tuple(zip(*testtlvs))
+        self.assertEquals(list(tlvs), proto.TLV.parse(''.join(datas)))
+
+        with self.assertRaises(TypeError):
+            # DisconnectTLV must not contain data
+            proto.TLV.parse('\0\1\0\1x')
+
+        
