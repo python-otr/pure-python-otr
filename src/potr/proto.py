@@ -54,12 +54,12 @@ def registertlv(cls):
     return cls
 
 
-def getslots(cls):
+def getslots(cls, base):
     ''' helper to collect all the message slots from ancestors '''
     clss = [cls]
     
     for cls in clss:
-        if cls == OTRMessage:
+        if cls == base:
             continue
 
         clss.extend(cls.__bases__)
@@ -86,7 +86,7 @@ class OTRMessage(object):
         if not isinstance(other, self.__class__):
             return False
 
-        for slot in getslots(self.__class__):
+        for slot in getslots(self.__class__, OTRMessage):
             if getattr(self, slot) != getattr(other, slot):
                 return False
         return True
@@ -303,6 +303,18 @@ class TLV(object):
         return [tlvClasses[typ].parsePayload(data[:length])] \
                 + cls.parse(data[length:])
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        for slot in getslots(self.__class__, TLV):
+            if getattr(self, slot) != getattr(other, slot):
+                return False
+        return True
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
+
 @registertlv
 class DisconnectTLV(TLV):
     typ = 1
@@ -325,7 +337,7 @@ class SMPTLV(TLV):
     def __init__(self, mpis=[]):
         if len(mpis) != self.dlen:
             raise TypeError('expected {0} mpis, got {1}'
-                    .format(self.dlen, count))
+                    .format(self.dlen, len(mpis)))
         self.mpis = mpis
 
     def getPayload(self):
