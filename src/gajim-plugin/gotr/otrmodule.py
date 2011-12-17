@@ -80,7 +80,7 @@ class GajimContext(potr.context.Context):
         self.smpWindow = ui.ContactOtrSmpWindow(self)
 
     def inject(self, msg, appdata=None):
-        log.warning('inject(appdata=%s)', appdata)
+        log.debug('inject(appdata=%s)', appdata)
         msg = unicode(msg)
         account = self.user.accountname
 
@@ -134,7 +134,7 @@ class GajimContext(potr.context.Context):
     def getPolicy(self, key):
         jid = gajim.get_room_and_nick_from_fjid(self.peer)[0]
         ret = self.user.plugin.get_flags(self.user.accountname, jid)[key]
-        log.warning('getPolicy(key=%s) = %s', key, ret)
+        log.debug('getPolicy(key=%s) = %s', key, ret)
         return ret
 
 class GajimOtrAccount(potr.context.Account):
@@ -502,15 +502,12 @@ class OtrPlugin(GajimPlugin):
         if xep_200 or not event.message:
             return PASS
 
-        print event
-
         if event.session:
             fjid = event.session.get_to()
         else:
             fjid = event.jid
             if event.resource:
                 fjid += '/' + event.resource
-        print (fjid, event.session, event.jid, event.resource)
 
         try:
             newmsg = self.us[event.account].getContext(fjid).sendMessage(

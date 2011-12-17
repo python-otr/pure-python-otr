@@ -322,7 +322,6 @@ class ContactOtrSmpWindow:
         self.plugin.update_context_list()
 
     def get_tlv(self, tlvs, check):
-        print (tlvs, check)
         for tlv in tlvs:
             if isinstance(tlv, check):
                 return tlv
@@ -505,7 +504,6 @@ class ContactOtrWindow(gtk.Dialog):
             # settings if available
             self.plugin.set_flags(None, self.account, self.jid)
         else:
-            print "got per-contact settings"
             # build the flags using the checkboxes
             flags = {}
             flags['ALLOW_V2'] = \
@@ -517,7 +515,6 @@ class ContactOtrWindow(gtk.Dialog):
             flags['WHITESPACE_START_AKE'] = \
                     self.gw('otr_policy_start_on_tag_checkbutton').get_active()
 
-            print "per-contact settings: ", flags
             self.plugin.set_flags(flags, self.account, self.jid)
 
     def _otr_default_checkbutton_toggled(self, widget):
