@@ -1,3 +1,6 @@
+# some python3 compatibilty
+from __future__ import print_function
+
 import os
 import pickle
 import sys
@@ -5,6 +8,7 @@ import sys
 import unittest
 
 import otr
+import potr
 from potr import context
 
 MMS = 30
@@ -12,6 +16,16 @@ PROTO = 'test'
 
 PNAME = 'P-pureotr'
 CNAME = 'C-libotr'
+
+try:
+    bytes('', encoding='ascii')
+except TypeError:
+    import __builtin__
+    def str(s, encoding='ascii'):
+        return __builtin__.str(s)
+    def bytes(s, encoding='ascii'):
+        return __builtin__.bytes(s)
+
 
 
 #############################################################################
@@ -25,7 +39,7 @@ class TestContext(context.Context):
         return self.user.policy[key]
 
     def inject(self, msg, appdata=None):
-        appdata.csend(str(msg))
+        appdata.csend(bytes(msg))
 
 class TestAccount(context.Account):
     contextclass = TestContext
@@ -34,9 +48,9 @@ class TestAccount(context.Account):
         self.policy = policy
     def loadPrivkey(self):
         try:
-            with open(os.path.join(sys.path[0], 'pTest.key'), 'r') as keyFile:
+            with open(os.path.join(sys.path[0], 'pTest.key'), 'rb') as keyFile:
                 return pickle.load(keyFile)
-        except IOError, e:
+        except IOError:
             return None
 
     def savePrivkey(self):
@@ -73,11 +87,11 @@ class COps:
     
     def inject_message(self, opdata=None, accountname=None, protocol=None,
             recipient=None, message=None):
-        opdata.psend(message)
+        opdata.psend(bytes(message, encoding='ascii'))
 
     def notify(sef, opdata=None, level=None, accountname=None, protocol=None,
             username=None, title=None, primary=None, secondary=None):
-        print '\nOTR notify: %r' % (title, primary, secondar)
+        print('\nOTR notify: %r' % (title, primary, secondary))
         pass # ignore
 
     def display_otr_message(self, opdata=None, accountname=None,
@@ -92,7 +106,7 @@ class COps:
 
     def new_fingerprint(self, opdata=None, userstate=None, accountname=None,
             protocol=None, username=None, fingerprint=None):
-        cFpReceived = otr.otrl_privkey_hash_to_human(fingerprint)
+        cFpReceived = fingerprint #otr.otrl_privkey_hash_to_human(fingerprint)
 
     def write_fingerprints(self, opdata=None):
         pass # ignore
@@ -112,7 +126,7 @@ class COps:
         pass # ignore
 
     def log_message(self, opdata=None, message=None):
-        print '\nOTR LOG: %r' % message
+        print('\nOTR LOG: %r' % message)
         pass # ignore
 
     def max_message_size(self, opdata=None, context=None):
@@ -156,8 +170,8 @@ class TestCommunicate(unittest.TestCase):
                     'ERROR_START_AKE':True,
                 })
 
-        self.psend(self.otrcsend('hello!'))
-        self.assertEqual(('hello!', []),
+        self.psend(bytes(self.otrcsend(b'hello!'), encoding='ascii'))
+        self.assertEqual((b'hello!', []),
                 self.otrpparse(self.pCtx, self.prcv()))
 
         # no more messages to process:
@@ -180,8 +194,10 @@ class TestCommunicate(unittest.TestCase):
                     'ERROR_START_AKE':True,
                 })
 
-        self.otrpsend(self.pCtx, 'hello!', context.FRAGMENT_SEND_ALL)
-        self.assertEqual((False, 'hello!', None), self.otrcparse(self.crcv()))
+        self.otrpsend(self.pCtx, b'hello!', context.FRAGMENT_SEND_ALL)
+        #self.assertEqual((False, 'hello!', None), self.otrcparse(self.crcv()))
+        self.assertEqual((True, b'hello!', None), self.process(self.pCtx,
+                self.cUserState))
 
         # no more messages to process:
         self.assertEqual((None, None, None), self.process(self.pCtx, self.cUserState))
@@ -203,14 +219,14 @@ class TestCommunicate(unittest.TestCase):
                     'ERROR_START_AKE':False,
                 })
 
-        origMsg = 'hello!'*100
+        origMsg = b'hello!'*100
 
         # no fragmentation, message unchanged
         msg = self.otrpsend(self.pCtx, origMsg)
         self.assertEqual(origMsg, msg)
         self.csend(msg)
 
-        self.assertEqual((False, origMsg, None), self.otrcparse(self.crcv()))
+        self.assertEqual((False, str(origMsg, encoding='ascii'), None), self.otrcparse(self.crcv()))
 
         # no more messages to process:
         self.assertEqual((None, None, None), self.process(self.pCtx, self.cUserState))
@@ -232,10 +248,10 @@ class TestCommunicate(unittest.TestCase):
                     'ERROR_START_AKE':False,
                 })
 
-        origMsg = 'hello!'*100
+        origMsg = b'hello!'*100
 
         # no fragmentation, message unchanged
-        msg = self.otrcsend(origMsg)
+        msg = bytes(self.otrcsend(origMsg), encoding='ascii')
         self.assertEqual(origMsg, msg)
         self.psend(msg)
 
@@ -259,11 +275,11 @@ class TestCommunicate(unittest.TestCase):
 
     def otrcparse(self, msg):
         return otr.otrl_message_receiving(self.cUserState, (self.cops, self),
-            CNAME, PROTO, PNAME, msg)
+            CNAME, PROTO, PNAME, str(msg, encoding='ascii'))
 
     def otrcsend(self, msg):
         return otr.otrl_message_sending(self.cUserState, (self.cops, self),
-            CNAME, PROTO, PNAME, msg, None)
+            CNAME, PROTO, PNAME, str(msg, encoding='ascii'), None)
 
     def otrpparse(self, ctx, msg):
         return ctx.receiveMessage(msg, appdata=self)
@@ -295,11 +311,16 @@ class TestCommunicate(unittest.TestCase):
     def process(self, pCtx, cUserState):
         while len(self.cQueue) > 0 or len(self.pQueue) > 0:
             if self.pQueue:
-                txt, tlvs = self.otrpparse(self.pCtx, self.prcv())
+                dat = self.prcv()
+                txt, tlvs = self.otrpparse(self.pCtx, dat)
+                #txt, tlvs = self.otrpparse(self.pCtx, self.prcv())
                 if txt:
                     return (False, txt, tlvs)
             if self.cQueue:
                 is_internal, txt, tlvs = self.otrcparse(self.crcv())
                 if not is_internal and txt:
-                    return (True, txt, tlvs)
+                    return (True, bytes(txt, encoding='ascii'), tlvs)
         return None, None, None
+
+if __name__ == '__main__':
+    unittest.main()

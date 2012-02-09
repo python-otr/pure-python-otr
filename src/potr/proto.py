@@ -14,15 +14,19 @@
 #
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
+
+# some python3 compatibilty
+from __future__ import unicode_literals
+
 import base64
 import logging
 import struct
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 
-OTRTAG = '?OTR'
-MESSAGE_TAG_BASE = ' \t  \t\t\t\t \t \t \t  '
-MESSAGE_TAG_V1 = ' \t \t  \t '
-MESSAGE_TAG_V2 = '  \t\t  \t '
+OTRTAG = b'?OTR'
+MESSAGE_TAG_BASE = b' \t  \t\t\t\t \t \t \t  '
+MESSAGE_TAG_V1 = b' \t \t  \t '
+MESSAGE_TAG_V2 = b'  \t\t  \t '
 
 MSGTYPE_NOTOTR = 0
 MSGTYPE_TAGGEDPLAINTEXT = 1
@@ -40,6 +44,14 @@ MSGFLAGS_IGNORE_UNREADABLE = 1
 
 tlvClasses = {}
 messageClasses = {}
+
+hasByteStr = bytes == str
+def bytesAndStrings(cls):
+    if hasByteStr:
+        cls.__str__ = lambda self: self.__bytes__()
+    else:
+        cls.__str__ = lambda self: str(self.__bytes__(), encoding='ascii')
+    return cls
 
 def registermessage(cls):
     if not hasattr(cls, 'parsePayload'):
@@ -67,6 +79,7 @@ def getslots(cls, base):
         for slot in cls.__slots__:
             yield slot
 
+@bytesAndStrings
 class OTRMessage(object):
     __slots__ = ['payload']
     version = 0x0002
@@ -77,10 +90,10 @@ class OTRMessage(object):
     def getPayload(self):
         return self.payload
 
-    def __str__(self):
-        data = struct.pack('!HB', self.version, self.msgtype) \
+    def __bytes__(self):
+        data = struct.pack(b'!HB', self.version, self.msgtype) \
                 + self.getPayload()
-        return '?OTR:%s.' % base64.b64encode(data)
+        return b'?OTR:' + base64.b64encode(data) + b'.'
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -102,8 +115,8 @@ class Error(OTRMessage):
     def __repr__(self):
         return '<proto.Error(%r)>' % self.error
 
-    def __str__(self):
-        return '?OTR Error:%s' % self.error
+    def __bytes__(self):
+        return b'?OTR Error:' + self.error
 
 class Query(OTRMessage):
     __slots__ = ['v1', 'v2']
@@ -115,27 +128,27 @@ class Query(OTRMessage):
     def parse(cls, data):
         v2 = False
         v1 = False
-        if len(data) > 0 and data[0] == '?':
+        if len(data) > 0 and data[0:1] == b'?':
             data = data[1:]
             v1 = True
 
-        if len(data) > 0 and data[0] == 'v':
+        if len(data) > 0 and data[0:1] == b'v':
             for c in data[1:]:
-                if c == '2':
+                if c == b'2'[0]:
                     v2 = True
         return cls(v1, v2)
 
     def __repr__(self):
         return '<proto.Query(v1=%r,v2=%r)>'%(self.v1,self.v2)
 
-    def __str__(self):
-        d = '?OTR'
+    def __bytes__(self):
+        d = b'?OTR'
         if self.v1:
-            d += '?'
-        d += 'v'
+            d += b'?'
+        d += b'v'
         if self.v2:
-            d += '2'
-        d += '?'
+            d += b'2'
+        d += b'?'
         return d
 
 class TaggedPlaintext(Query):
@@ -145,7 +158,7 @@ class TaggedPlaintext(Query):
         self.v1 = v1
         self.v2 = v2
 
-    def __str__(self):
+    def __bytes__(self):
         data = self.msg + MESSAGE_TAG_BASE
         if self.v1:
             data += MESSAGE_TAG_V1
@@ -214,7 +227,7 @@ class GenericOTRMessage(OTRMessage):
         for k, ftype in cls.fields:
             if ftype == 'data':
                 value, data = read_data(data)
-            elif isinstance(ftype, str):
+            elif isinstance(ftype, bytes):
                 size = int(struct.calcsize(ftype))
                 value, data = unpack(ftype, data)
             elif isinstance(ftype, int):
@@ -223,14 +236,14 @@ class GenericOTRMessage(OTRMessage):
         return cls(*args)
 
     def getPayload(self, *ffilter):
-        payload = ''
+        payload = b''
         for k, ftype in self.fields:
             if k in ffilter:
                 continue
 
             if ftype == 'data':
                 payload += pack_data(self.data[k])
-            elif isinstance(ftype, str):
+            elif isinstance(ftype, bytes):
                 payload += struct.pack(ftype, self.data[k])
             else:
                 payload += self.data[k]
@@ -261,7 +274,7 @@ class RevealSig(AKEMessage):
 
     def getMacedData(self):
         p = self.encsig
-        return struct.pack('!I', len(p)) + p
+        return struct.pack(b'!I', len(p)) + p
 
 @registermessage
 class Signature(AKEMessage):
@@ -271,19 +284,20 @@ class Signature(AKEMessage):
 
     def getMacedData(self):
         p = self.encsig
-        return struct.pack('!I', len(p)) + p
+        return struct.pack(b'!I', len(p)) + p
 
 @registermessage
 class DataMessage(GenericOTRMessage):
     __slots__ = []
     msgtype = 0x03
-    fields = [('flags','!B'), ('skeyid','!I'), ('rkeyid','!I'), ('dhy','data'),
+    fields = [('flags',b'!B'), ('skeyid',b'!I'), ('rkeyid',b'!I'), ('dhy','data'),
             ('ctr',8), ('encmsg','data'), ('mac',20), ('oldmacs','data'), ]
 
     def getMacedData(self):
-        return struct.pack('!HB', self.version, self.msgtype) + \
+        return struct.pack(b'!HB', self.version, self.msgtype) + \
                 self.getPayload('mac', 'oldmacs')
 
+@bytesAndStrings
 class TLV(object):
     __slots__ = []
 
@@ -291,15 +305,16 @@ class TLV(object):
         val = self.getPayload()
         return '<{cls}(typ={t},len={l},val={v!r})>'.format(t=self.typ,
                 l=len(val), v=val, cls=self.__class__.__name__)
-    def __str__(self):
+
+    def __bytes__(self):
         val = self.getPayload()
-        return struct.pack('!HH', self.typ, len(val)) + val
+        return struct.pack(b'!HH', self.typ, len(val)) + val
 
     @classmethod
     def parse(cls, data):
         if not data:
             return []
-        typ, length, data = unpack('!HH', data)
+        typ, length, data = unpack(b'!HH', data)
         return [tlvClasses[typ].parsePayload(data[:length])] \
                 + cls.parse(data[length:])
 
@@ -322,7 +337,7 @@ class DisconnectTLV(TLV):
         pass
 
     def getPayload(self):
-        return ''
+        return b''
 
     @classmethod
     def parsePayload(cls, data):
@@ -341,7 +356,7 @@ class SMPTLV(TLV):
         self.mpis = mpis
 
     def getPayload(self):
-        d = struct.pack('!I', len(self.mpis))
+        d = struct.pack(b'!I', len(self.mpis))
         for n in self.mpis:
             d += pack_mpi(n)
         return d
@@ -350,7 +365,7 @@ class SMPTLV(TLV):
     def parsePayload(cls, data):
         mpis = []
         if cls.dlen > 0:
-            count, data = unpack('!I', data)
+            count, data = unpack(b'!I', data)
             for i in range(count):
                 n, data = read_mpi(data)
                 mpis.append(n)
@@ -374,7 +389,7 @@ class SMP1QTLV(SMPTLV):
         super(SMP1QTLV, self).__init__(mpis)
 
     def getPayload(self):
-        return self.msg + '\0' + super(SMP1QTLV, self).getPayload()
+        return self.msg + b'\0' + super(SMP1QTLV, self).getPayload()
 
     @classmethod
     def parsePayload(cls, data):
@@ -402,15 +417,18 @@ class SMPABORTTLV(SMPTLV):
     typ = 6
     dlen = 0
 
+    def getPayload(self):
+        return b''
+
 def pack_mpi(n):
     return pack_data(long_to_bytes(n))
 def read_mpi(data):
     n, data = read_data(data)
     return bytes_to_long(n), data
 def pack_data(data):
-    return struct.pack('!I', len(data)) + data
+    return struct.pack(b'!I', len(data)) + data
 def read_data(data):
-    datalen, data= unpack('!I', data)
+    datalen, data= unpack(b'!I', data)
     return data[:datalen], data[datalen:]
 def unpack(fmt, buf):
     s = struct.Struct(fmt)

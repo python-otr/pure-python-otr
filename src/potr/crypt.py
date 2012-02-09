@@ -14,6 +14,10 @@
 #
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
+
+# some python3 compatibilty
+from __future__ import unicode_literals
+
 import logging
 import struct
 from numbers import Number
@@ -25,8 +29,8 @@ from Crypto.Hash import HMAC as _HMAC
 from Crypto.PublicKey import DSA
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 
-import proto
-import context
+from potr import proto
+
 
 # XXX atfork?
 RNG = Random.new()
@@ -41,7 +45,7 @@ STATE_V1_SETUP = 5
 DH1536_MODULUS = 2410312426921032588552076022197566074856950548502459942654116941958108831682612228890093858261341614673227141477904012196503648957050582631942730706805009223062734745341073406696246014589361659774041027169249453200378729434170325843778659198143763193776859869524088940195577346119843545301547043747207749969763750084308926339295559968882457872412993810129130294592999947926365264059284647209730384947211681434464714438488520940127459844288859336526896320919633919
 DH1536_MODULUS_2 = DH1536_MODULUS-2
 DH1536_GENERATOR = 2
-SM_ORDER = (DH1536_MODULUS - 1) / 2
+SM_ORDER = (DH1536_MODULUS - 1) // 2
 
 def check_group(n):
     return 2 <= n <= DH1536_MODULUS_2
@@ -69,7 +73,7 @@ def SHA256HMAC160(key, data):
 def human_hash(fp):
     fp = fp.upper()
     fplen = len(fp)
-    wordsize = fplen/5
+    wordsize = fplen//5
     buf = ''
     for w in range(0, fplen, wordsize):
         buf += '{0} '.format(fp[w:w+wordsize])
@@ -94,13 +98,13 @@ class Counter(object):
         return '<Counter(p={p!r},v={v!r})>'.format(p=self.prefix, v=self.val)
 
     def byteprefix(self):
-        return long_to_bytes(self.prefix).rjust(8, '\0')
+        return long_to_bytes(self.prefix).rjust(8, b'\0')
 
     def __call__(self):
         val = long_to_bytes(self.val)
         prefix = long_to_bytes(self.prefix)
         self.val += 1
-        return self.byteprefix() + val.rjust(8, '\0')
+        return self.byteprefix() + val.rjust(8, b'\0')
 
 def AESCTR(key, counter=0):
     if isinstance(counter, Number):
@@ -113,10 +117,10 @@ def toMpi(n):
     return toData(long_to_bytes(n))
 
 def toData(s):
-    return struct.pack('!I', len(s)) + s
+    return struct.pack(b'!I', len(s)) + s
 
 def fromMpi(data):
-    size, data = proto.unpack('!I', data)
+    size, data = proto.unpack(b'!I', data)
     return bytes_to_long(data[:size]), data[size:]
 
 class DH(object):
@@ -155,7 +159,7 @@ class PK(object):
 
     @staticmethod
     def parse(data):
-        typeid, data = proto.unpack('!H', data)
+        typeid, data = proto.unpack(b'!H', data)
         cls = pkTypes.get(typeid, None)
         if cls is None:
             raise NotImplementedError('unknown typeid %r' % typeid)
@@ -192,7 +196,7 @@ class DSAKey(PK):
             raise TypeError('DSA object or 4/5-tuple required for key')
 
     def serializePublicKey(self):
-        return struct.pack('!H', self.pubkeyType) + \
+        return struct.pack(b'!H', self.pubkeyType) + \
                 self.getPayload()
 
     def getPayload(self):
@@ -271,11 +275,11 @@ class DHSession(object):
         sb = toMpi(s)
 
         if dh.pub > y:
-            sendbyte = '\1'
-            rcvbyte = '\2'
+            sendbyte = b'\1'
+            rcvbyte = b'\2'
         else:
-            sendbyte = '\2'
-            rcvbyte = '\1'
+            sendbyte = b'\2'
+            rcvbyte = b'\1'
 
         sendenc = SHA1(sendbyte + sb)[:16]
         sendmac = SHA1(sendenc)
@@ -378,8 +382,8 @@ class CryptEngine(object):
         plaintextData = AESCTR(sesskey.rcvenc, sesskey.rcvctr) \
                 .decrypt(msg.encmsg)
 
-        if '\0' in plaintextData:
-            plaintext, tlvData = plaintextData.split('\0', 1)
+        if b'\0' in plaintextData:
+            plaintext, tlvData = plaintextData.split(b'\0', 1)
             tlvs = proto.TLV.parse(tlvData)
         else:
             plaintext = plaintextData
@@ -423,12 +427,12 @@ class CryptEngine(object):
                 .format(sess.sendenc, sess.sendmac, sess.sendctr))
 
         # plaintext + TLVS
-        plainBuf = message + '\0' + ''.join([ str(t) for t in tlvs])
+        plainBuf = message + b'\0' + b''.join([ bytes(t) for t in tlvs])
         encmsg = AESCTR(sess.sendenc, sess.sendctr).encrypt(plainBuf)
 
         msg = proto.DataMessage(flags, self.ourKeyid-1, self.theirKeyid,
                 long_to_bytes(self.ourDHKey.pub), sess.sendctr.byteprefix(),
-                encmsg, '', ''.join(self.savedMacKeys))
+                encmsg, b'', b''.join(self.savedMacKeys))
         msg.mac = SHA1HMAC(sess.sendmac, msg.getMacedData())
         return msg
 
@@ -498,7 +502,7 @@ class CryptEngine(object):
             self.sessionkeys[0][0] = DHSession.create(self.ourDHKey, self.theirY)
             self.rotateDHKeys()
 
-        self.ctx.setState(context.STATE_ENCRYPTED)
+        self.ctx._wentEncrypted()
         logging.info('went encrypted with {0}'.format(self.theirPubkey))
 
     def finished(self):
@@ -564,7 +568,7 @@ class AuthKeyExchange(object):
 
             self.state = STATE_AWAITING_SIG
 
-            self.lastmsg = proto.RevealSig(self.r, aesxb, '')
+            self.lastmsg = proto.RevealSig(self.r, aesxb, b'')
             self.lastmsg.mac = SHA256HMAC160(self.mac_m2,
                     self.lastmsg.getMacedData())
             return self.lastmsg
@@ -609,7 +613,7 @@ class AuthKeyExchange(object):
         self.ourKeyid = 0
         self.state = STATE_NONE
 
-        cmpmac = struct.pack('!I', len(aesxb)) + aesxb
+        cmpmac = struct.pack(b'!I', len(aesxb)) + aesxb
 
         return proto.Signature(aesxb, SHA256HMAC160(self.mac_m2p, cmpmac))
 
@@ -634,24 +638,24 @@ class AuthKeyExchange(object):
     def createAuthKeys(self):
         s = pow(self.gy, self.dh.priv, DH1536_MODULUS)
         sbyte = toMpi(s)
-        self.sessionId = SHA256('\0' + sbyte)[:8]
-        enc = SHA256('\1' + sbyte)
+        self.sessionId = SHA256(b'\0' + sbyte)[:8]
+        enc = SHA256(b'\1' + sbyte)
         self.enc_c, self.enc_cp = enc[:16], enc[16:]
-        self.mac_m1 = SHA256('\2' + sbyte)
-        self.mac_m2 = SHA256('\3' + sbyte)
-        self.mac_m1p = SHA256('\4' + sbyte)
-        self.mac_m2p = SHA256('\5' + sbyte)
+        self.mac_m1 = SHA256(b'\2' + sbyte)
+        self.mac_m2 = SHA256(b'\3' + sbyte)
+        self.mac_m1p = SHA256(b'\4' + sbyte)
+        self.mac_m2p = SHA256(b'\5' + sbyte)
 
     def calculatePubkeyAuth(self, key, mackey):
         pubkey = self.privkey.serializePublicKey()
         buf = toMpi(self.dh.pub)
         buf += toMpi(self.gy)
         buf += pubkey
-        buf += struct.pack('!I', self.ourKeyid)
+        buf += struct.pack(b'!I', self.ourKeyid)
         MB = self.privkey.sign(SHA256HMAC(mackey, buf))
 
         buf = pubkey
-        buf += struct.pack('!I', self.ourKeyid)
+        buf += struct.pack(b'!I', self.ourKeyid)
         buf += MB
         return AESCTR(key).encrypt(buf)
 
@@ -659,14 +663,14 @@ class AuthKeyExchange(object):
         auth = AESCTR(key).decrypt(encsig)
         self.theirPubkey, auth = PK.parse(auth)
 
-        receivedKeyid, auth = proto.unpack('!I', auth)
+        receivedKeyid, auth = proto.unpack(b'!I', auth)
         if receivedKeyid == 0:
             raise InvalidParameterError
 
         authbuf = toMpi(self.gy)
         authbuf += toMpi(self.dh.pub)
         authbuf += self.theirPubkey.serializePublicKey()
-        authbuf += struct.pack('!I', receivedKeyid)
+        authbuf += struct.pack(b'!I', receivedKeyid)
 
         if self.theirPubkey.verify(SHA256HMAC(mackey, authbuf), auth) is False:
             raise InvalidParameterError
@@ -699,7 +703,7 @@ class SMPHandler:
         self.sendTLV(proto.SMPABORTTLV(), appdata=appdata)
 
     def sendTLV(self, tlv, appdata=None):
-        self.crypto.ctx.inject(self.crypto.createDataMessage('',
+        self.crypto.ctx.inject(self.crypto.createDataMessage(b'',
                 flags=proto.MSGFLAGS_IGNORE_UNREADABLE, tlvs=[tlv]),
                 appdata=appdata)
 
@@ -859,7 +863,7 @@ class SMPHandler:
         ourFP = self.crypto.ctx.user.getPrivkey().fingerprint()
         if self.state == 1:
             # first secret -> SMP1TLV
-            combSecret = SHA256('\1' + ourFP +
+            combSecret = SHA256(b'\1' + ourFP +
                     self.crypto.theirPubkey.fingerprint() +
                     self.crypto.sessionId + secret)
 
@@ -881,7 +885,7 @@ class SMPHandler:
                 self.sendTLV(proto.SMP1QTLV(question, msg), appdata=appdata)
         if self.state == 0:
             # response secret -> SMP2TLV
-            combSecret = SHA256('\1' + self.crypto.theirPubkey.fingerprint() +
+            combSecret = SHA256(b'\1' + self.crypto.theirPubkey.fingerprint() +
                     ourFP + self.crypto.sessionId + secret)
 
             self.secret = bytes_to_long(combSecret)

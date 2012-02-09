@@ -15,13 +15,31 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-import collections
+# some python3 compatibilty
+from __future__ import print_function
+from __future__ import unicode_literals
+
+try:
+    basestring = basestring
+except NameError:
+    # all strings are unicode in python3k
+    basestring = str
+
+# callable is not available in python 3.0 and 3.1
+try:
+    callable = callable
+except NameError:
+    from collections import Callable
+    def callable(x):
+        return isinstance(x, Callable)
+
+
 import base64
 import logging
 import struct
 
-import crypt
-import proto
+from potr import crypt
+from potr import proto
 
 from time import time
 
@@ -77,7 +95,7 @@ class Context(object):
         to be ignored, returns a string if the message is ready for further
         processing'''
 
-        params = message.split(',')
+        params = message.split(b',')
         if len(params) < 5 or not params[1].isdigit() or not params[2].isdigit():
             logging.warning('invalid formed fragmented message: %r', params)
             return None
@@ -107,7 +125,7 @@ class Context(object):
             return None
 
         if n == k > 0:
-            assembled = ''.join(self.fragment)
+            assembled = b''.join(self.fragment)
             self.discardFragment()
             return assembled
 
@@ -198,13 +216,13 @@ class Context(object):
                 plaintext, tlvs = self.crypto.handleDataMessage(message)
                 self.processTLVs(tlvs, appdata=appdata)
                 if plaintext and self.lastSend < time() - HEARTBEAT_INTERVAL:
-                    self.sendInternal('', appdata=appdata)
+                    self.sendInternal(b'', appdata=appdata)
                 return plaintext or None, tlvs
-            except crypt.InvalidParameterError, e:
+            except crypt.InvalidParameterError:
                 if ignore:
                     return IGN
                 logging.exception('decryption failed')
-                raise e
+                raise
         if isinstance(message, basestring):
             if self.state != STATE_PLAINTEXT or \
                     self.getPolicy('REQUIRE_ENCRYPTION'):
@@ -221,12 +239,12 @@ class Context(object):
                     flags=proto.MSGFLAGS_IGNORE_UNREADABLE, tlvs=tlvs,
                     appdata=appdata)
         else:
-            self.sendFragmented(FRAGMENT_SEND_ALL, str(msg), appdata=appdata)
+            self.sendFragmented(FRAGMENT_SEND_ALL, bytes(msg), appdata=appdata)
 
     def sendMessage(self, sendPolicy, msg, flags=0, tlvs=[], appdata=None):
         if self.policyOtrEnabled():
             self.lastSend = time()
-            msg = str(self.processOutgoingMessage(msg, flags, tlvs))
+            msg = bytes(self.processOutgoingMessage(msg, flags, tlvs))
         return self.sendFragmented(sendPolicy, msg, appdata=appdata)
 
     def processOutgoingMessage(self, msg, flags, tlvs=[]):
@@ -256,7 +274,7 @@ class Context(object):
 
     def disconnect(self, appdata=None):
         if self.state != STATE_FINISHED:
-            self.sendInternal('', tlvs=[proto.DisconnectTLV()], appdata=appdata)
+            self.sendInternal(b'', tlvs=[proto.DisconnectTLV()], appdata=appdata)
             self.setState(STATE_PLAINTEXT)
             self.crypto.finished()
         else:
@@ -264,6 +282,9 @@ class Context(object):
 
     def setState(self, newstate):
         self.state = newstate
+
+    def _wentEncrypted(self):
+        self.setState(STATE_ENCRYPTED)
 
     def sendFragmented(self, sendPolicy, msg, appdata=None):
         mms = self.user.maxMessageSize
@@ -279,7 +300,8 @@ class Context(object):
                 raise OverflowError('too many fragments')
 
             for fi in range(len(fragments)):
-                fragments[fi] = '?OTR,{0},{1},{2},'.format(fi+1, fc, fragments[fi])
+                fragments[fi] = b'?OTR,' + (fi+1) + b',' + fc + b',' \
+                        + fragments[fi] + b','
 
             if sendPolicy == FRAGMENT_SEND_ALL:
                 for f in fragments:
@@ -354,7 +376,7 @@ class Context(object):
         indexBase = otrTagPos + len(proto.OTRTAG)
         compare = message[indexBase]
 
-        if compare == ',':
+        if compare == b','[0]:
             message = self.fragmentAccumulate(message[indexBase:])
             if message is None:
                 return None
@@ -363,20 +385,21 @@ class Context(object):
         else:
             self.discardFragment()
 
-        hasq = compare == '?'
-        hasv = compare == 'v'
+        hasq = compare == b'?'[0]
+        hasv = compare == b'v'[0]
         if hasq or hasv:
-            hasv |= len(message) > indexBase+1 and message[indexBase+1] == 'v'
+            hasv |= len(message) > indexBase+1 and \
+                    message[indexBase+1] == b'v'[0]
             if hasv:
-                end = message.find('?', indexBase+1)
+                end = message.find(b'?', indexBase+1)
             else:
                 end = indexBase+1
             payload = message[indexBase:end]
             return proto.Query.parse(payload)
 
-        if compare == ':' and len(message) > indexBase + 4:
+        if compare == b':'[0] and len(message) > indexBase + 4:
             infoTag = base64.b64decode(message[indexBase+1:indexBase+5])
-            classInfo = struct.unpack('!HB', infoTag)
+            classInfo = struct.unpack(b'!HB', infoTag)
             cls = proto.messageClasses.get(classInfo, None)
             if cls is None:
                 return message
@@ -384,7 +407,7 @@ class Context(object):
                     .format(user=self.user.name, typ=cls))
             return cls.parsePayload(message[indexBase+5:])
 
-        if message[indexBase:indexBase+7] == ' Error:':
+        if message[indexBase:indexBase+7] == b' Error:':
             return proto.Error(message[indexBase+7:])
 
         return message
@@ -398,10 +421,10 @@ class Account(object):
         self.protocol = protocol
         self.ctxs = {}
         self.maxMessageSize = maxMessageSize
-        self.defaultQuery = '?OTRv{versions}?\n{accountname} has requested ' \
-                'an Off-the-Record private conversation.  However, you ' \
-                'do not have a plugin to support that.\nSee '\
-                'http://otr.cypherpunks.ca/ for more information.';
+        self.defaultQuery = b'?OTRv{versions}?\n{accountname} has requested ' \
+                b'an Off-the-Record private conversation.  However, you ' \
+                b'do not have a plugin to support that.\nSee '\
+                b'http://otr.cypherpunks.ca/ for more information.';
 
     def __repr__(self):
         return '<{cls}(name={name!r})>'.format(cls=self.__class__.__name__,
@@ -430,12 +453,12 @@ class Account(object):
     def getContext(self, uid, newCtxCb=None):
         if uid not in self.ctxs:
             self.ctxs[uid] = self.contextclass(self, uid)
-            if isinstance(newCtxCb, collections.Callable):
+            if callable(newCtxCb):
                 newCtxCb(self.ctxs[uid])
         return self.ctxs[uid]
 
     def getDefaultQueryMessage(self, policy):
-        v  = '2' if policy('ALLOW_V2') else ''
+        v  = b'2' if policy('ALLOW_V2') else b''
         return self.defaultQuery.format(accountname=self.name, versions=v)
 
 class NotEncryptedError(RuntimeError):

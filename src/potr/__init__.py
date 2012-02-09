@@ -14,9 +14,13 @@
 #
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
-import context
-import proto
-from crypt import human_hash
+
+# some python3 compatibilty
+from __future__ import unicode_literals
+
+from potr import context
+from potr import proto
+from potr.crypt import human_hash
 
 ''' version is: (major, minor, patch, sub) with sub being one of 'alpha',
 'beta', 'final' '''
