@@ -337,6 +337,8 @@ class Context(object):
             logging.info('got unhandled tlv: {0!r}'.format(tlv))
 
     def smpAbort(self, appdata=None):
+        if self.state != STATE_ENCRYPTED:
+            raise NotEncryptedError
         self.crypto.smpAbort(appdata=appdata)
 
     def smpIsValid(self):
@@ -347,9 +349,13 @@ class Context(object):
                 if self.crypto.smp else None
 
     def smpGotSecret(self, secret, question=None, appdata=None):
+        if self.state != STATE_ENCRYPTED:
+            raise NotEncryptedError
         self.crypto.smpSecret(secret, question=question, appdata=appdata)
 
     def smpInit(self, secret, question=None, appdata=None):
+        if self.state != STATE_ENCRYPTED:
+            raise NotEncryptedError
         self.crypto.smp = None
         self.crypto.smpSecret(secret, question=question, appdata=appdata)
 
