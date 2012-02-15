@@ -24,6 +24,7 @@ try:
 except NameError:
     # all strings are unicode in python3k
     basestring = str
+    unicode = str
 
 # callable is not available in python 3.0 and 3.1
 try:
@@ -300,7 +301,8 @@ class Context(object):
                 raise OverflowError('too many fragments')
 
             for fi in range(len(fragments)):
-                fragments[fi] = b'?OTR,' + (fi+1) + b',' + fc + b',' \
+                ctr = unicode(fi+1) + ',' + unicode(fc) + ','
+                fragments[fi] = b'?OTR,' + ctr.encode('ascii') \
                         + fragments[fi] + b','
 
             if sendPolicy == FRAGMENT_SEND_ALL:
