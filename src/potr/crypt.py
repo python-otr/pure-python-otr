@@ -155,7 +155,7 @@ class PK(object):
         raise NotImplementedError
 
     def cfingerprint(self):
-        return '{0:02x}'.format(bytes_to_long(self.fingerprint()))
+        return '{0:040x}'.format(bytes_to_long(self.fingerprint()))
 
     @staticmethod
     def parse(data):
