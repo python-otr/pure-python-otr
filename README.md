@@ -11,7 +11,7 @@ Install the potr Python module:
 
 To use the Gajim plugin please see the gotr README file.
 
-__Dependencies__: pycrypto >= 2.1 (see dlitz/pycrypto)
+__Dependencies__: pycrypto >= 2.1 (see [dlitz/pycrypto](/dlitz/pycrypto))
 
 
 libotr SWIG bindings
