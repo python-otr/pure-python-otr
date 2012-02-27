@@ -393,7 +393,7 @@ class SMP1QTLV(SMPTLV):
 
     @classmethod
     def parsePayload(cls, data):
-        msg, data = data.split('\0', 1)
+        msg, data = data.split(b'\0', 1)
         mpis = SMP1TLV.parsePayload(data).mpis
         return cls(msg, mpis)
 
