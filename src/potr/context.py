@@ -1,4 +1,4 @@
-#    Copyright 2011 Kjell Braden <afflux@pentabarf.de>
+#    Copyright 2011-2012 Kjell Braden <afflux@pentabarf.de>
 #
 #    This file is part of the python-potr library.
 #
@@ -16,7 +16,6 @@
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
 # some python3 compatibilty
-from __future__ import print_function
 from __future__ import unicode_literals
 
 try:
