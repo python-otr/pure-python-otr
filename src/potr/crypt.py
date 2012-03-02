@@ -489,8 +489,8 @@ SMPPROG_FAILED = -1
 SMPPROG_SUCCEEDED = 1
 
 class SMPHandler:
-    __slots__ = ['crypto', 'question', 'prog', 'state', 'g1', 'g3o', 'x2',
-            'x3', 'g2', 'g3', 'pab', 'qab', 'secret', 'p', 'q']
+    __slots__ = ['crypto', 'questionReceived', 'prog', 'state', 'g1', 'g3o',
+            'x2', 'x3', 'g2', 'g3', 'pab', 'qab', 'secret', 'p', 'q']
 
     def __init__(self, crypto):
         self.crypto = crypto
@@ -500,7 +500,7 @@ class SMPHandler:
         self.prog = SMPPROG_OK
         self.pab = None
         self.qab = None
-        self.question = False
+        self.questionReceived = False
         self.secret = None
         self.p = None
         self.q = None
@@ -520,7 +520,8 @@ class SMPHandler:
         if isinstance(tlv, proto.SMPABORTTLV):
             self.state = 1
             return
-        if isinstance(tlv, (proto.SMP1TLV, proto.SMP1QTLV)):
+        is1qTlv = isinstance(tlv, proto.SMP1QTLV)
+        if isinstance(tlv, proto.SMP1TLV) or is1qTlv:
             if self.state != 1:
                 self.abort(appdata=appdata)
                 return
@@ -534,6 +535,8 @@ class SMPHandler:
                 logging.error('invalid SMP1TLV received')
                 self.abort(appdata=appdata)
                 return
+
+            self.questionReceived = is1qTlv
 
             self.g3o = msg[3]
 
@@ -634,7 +637,8 @@ class SMPHandler:
                 return
 
             logging.info('secrets matched')
-            self.crypto.ctx.setCurrentTrust('smp')
+            if not self.questionReceived:
+                self.crypto.ctx.setCurrentTrust('smp')
             self.state = 1
             self.sendTLV(proto.SMP4TLV(msg), appdata=appdata)
             return
@@ -724,7 +728,7 @@ class SMPHandler:
                 * pow(self.g2, r2, DH1536_MODULUS) % DH1536_MODULUS
         temp1 = pow(self.g3, r1, DH1536_MODULUS)
 
-        cb = SHA256(chr(v) + pack_mpi(temp1) + pack_mpi(temp2))
+        cb = SHA256(struct.pack(b'B', v) + pack_mpi(temp1) + pack_mpi(temp2))
         c = bytes_to_long(cb)
 
         temp1 = r * c % SM_ORDER
@@ -743,7 +747,7 @@ class SMPHandler:
                 * pow(self.g2, d2, DH1536_MODULUS) \
                 * pow(q, c, DH1536_MODULUS) % DH1536_MODULUS
 
-        cprime = SHA256(chr(v) + pack_mpi(temp1) + pack_mpi(temp2))
+        cprime = SHA256(struct.pack(b'B', v) + pack_mpi(temp1) + pack_mpi(temp2))
 
         return long_to_bytes(c) == cprime
 
@@ -752,7 +756,7 @@ class SMPHandler:
         temp1 = pow(self.g1, r, DH1536_MODULUS)
         temp2 = pow(self.qab, r, DH1536_MODULUS)
 
-        cb = SHA256(chr(v) + pack_mpi(temp1) + pack_mpi(temp2))
+        cb = SHA256(struct.pack(b'B', v) + pack_mpi(temp1) + pack_mpi(temp2))
         c = bytes_to_long(cb)
         temp1 = self.x3 * c % SM_ORDER
         d = (r - temp1) % SM_ORDER
@@ -766,12 +770,12 @@ class SMPHandler:
         temp2 = pow(self.qab, d, DH1536_MODULUS) \
                 * pow(r, c, DH1536_MODULUS) % DH1536_MODULUS
 
-        cprime = SHA256(chr(v) + pack_mpi(temp1) + pack_mpi(temp2))
+        cprime = SHA256(struct.pack(b'B', v) + pack_mpi(temp1) + pack_mpi(temp2))
         return long_to_bytes(c) == cprime
 
 def proof_known_log(g, x, v):
     r = bytes_to_long(RNG.read(192))
-    c = bytes_to_long(SHA256(chr(v) + pack_mpi(pow(g, r, DH1536_MODULUS))))
+    c = bytes_to_long(SHA256(struct.pack(b'B', v) + pack_mpi(pow(g, r, DH1536_MODULUS))))
     temp = x * c % SM_ORDER
     return c, (r-temp) % SM_ORDER
 
@@ -779,7 +783,7 @@ def check_known_log(c, d, g, x, v):
     gd = pow(g, d, DH1536_MODULUS)
     xc = pow(x, c, DH1536_MODULUS)
     gdxc = gd * xc % DH1536_MODULUS
-    return SHA256(chr(v) + pack_mpi(gdxc)) == long_to_bytes(c)
+    return SHA256(struct.pack(b'B', v) + pack_mpi(gdxc)) == long_to_bytes(c)
 
 def invMod(n):
     return pow(n, DH1536_MODULUS_2, DH1536_MODULUS)
