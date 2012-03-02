@@ -16,8 +16,11 @@ class ProtoTest(unittest.TestCase):
 
     def testEncodeMpi(self):
         # small values
-        self.assertEqual(b'\0\0\0\1\0', proto.pack_mpi(0))
         self.assertEqual(b'\0\0\0\2\xff\0', proto.pack_mpi(65280))
+        # the OTR protocol describes MPIs as carrying no leading zeros
+        # so 0 itself should be encoded as the empty string
+        self.assertEqual(b'\0\0\0\0', proto.pack_mpi(0))
+
         # large values
         self.assertEqual(b'\0\0\1\1\1' + 256*b'\0', proto.pack_mpi(0x100**0x100))
 
