@@ -21,7 +21,7 @@ from __future__ import unicode_literals
 import base64
 import logging
 import struct
-from Crypto.Util.number import bytes_to_long, long_to_bytes
+from potr.utils import pack_mpi, read_mpi, pack_data, read_data, unpack
 
 OTRTAG = b'?OTR'
 MESSAGE_TAG_BASE = b' \t  \t\t\t\t \t \t \t  '
@@ -419,18 +419,3 @@ class SMPABORTTLV(SMPTLV):
 
     def getPayload(self):
         return b''
-
-def pack_mpi(n):
-    return pack_data(long_to_bytes(n))
-def read_mpi(data):
-    n, data = read_data(data)
-    return bytes_to_long(n), data
-def pack_data(data):
-    return struct.pack(b'!I', len(data)) + data
-def read_data(data):
-    datalen, data= unpack(b'!I', data)
-    return data[:datalen], data[datalen:]
-def unpack(fmt, buf):
-    s = struct.Struct(fmt)
-    return s.unpack(buf[:s.size]) + (buf[s.size:],)
-

@@ -49,7 +49,7 @@ class TestAccount(context.Account):
     def loadPrivkey(self):
         try:
             with open(os.path.join(sys.path[0], 'pTest.key'), 'rb') as keyFile:
-                return pickle.load(keyFile)
+                return potr.crypt.PK.parsePrivateKey(keyFile.read())[0]
         except IOError:
             return None
 

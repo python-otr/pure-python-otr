@@ -20,20 +20,13 @@ from __future__ import unicode_literals
 
 import logging
 import struct
-from numbers import Number
 
-from Crypto import Cipher, Random
-from Crypto.Hash import SHA256 as _SHA256
-from Crypto.Hash import SHA as _SHA1
-from Crypto.Hash import HMAC as _HMAC
-from Crypto.PublicKey import DSA
-from Crypto.Util.number import bytes_to_long, long_to_bytes
 
+from potr.compatcrypto import SHA256, SHA1, HMAC, SHA1HMAC, SHA256HMAC, \
+        SHA256HMAC160, Counter, AESCTR, RNG, PK
+from potr.utils import bytes_to_long, long_to_bytes, pack_mpi, read_mpi
 from potr import proto
 
-
-# XXX atfork?
-RNG = Random.new()
 
 STATE_NONE = 0
 STATE_AWAITING_DHKEY = 1
@@ -52,77 +45,6 @@ def check_group(n):
 def check_exp(n):
     return 1 <= n < SM_ORDER
 
-def SHA256(data):
-    return _SHA256.new(data).digest()
-
-def SHA1(data):
-    return _SHA1.new(data).digest()
-
-def HMAC(key, data, mod):
-    return _HMAC.new(key, msg=data, digestmod=mod).digest()
-
-def SHA1HMAC(key, data):
-    return HMAC(key, data, _SHA1)
-
-def SHA256HMAC(key, data):
-    return HMAC(key, data, _SHA256)
-
-def SHA256HMAC160(key, data):
-    return SHA256HMAC(key, data)[:20]
-
-def human_hash(fp):
-    fp = fp.upper()
-    fplen = len(fp)
-    wordsize = fplen//5
-    buf = ''
-    for w in range(0, fplen, wordsize):
-        buf += '{0} '.format(fp[w:w+wordsize])
-    return buf.rstrip()
-
-class Counter(object):
-    __slots__ = ['prefix', 'val']
-    def __init__(self, prefix):
-        self.prefix = prefix
-        self.val = 0
-
-    def inc(self):
-        self.prefix += 1
-        self.val = 0
-
-    def __setattr__(self, attr, val):
-        if attr == 'prefix':
-            self.val = 0
-        super(Counter, self).__setattr__(attr, val)
-
-    def __repr__(self):
-        return '<Counter(p={p!r},v={v!r})>'.format(p=self.prefix, v=self.val)
-
-    def byteprefix(self):
-        return long_to_bytes(self.prefix).rjust(8, b'\0')
-
-    def __call__(self):
-        val = long_to_bytes(self.val)
-        prefix = long_to_bytes(self.prefix)
-        self.val += 1
-        return self.byteprefix() + val.rjust(8, b'\0')
-
-def AESCTR(key, counter=0):
-    if isinstance(counter, Number):
-        counter = Counter(counter)
-    if not isinstance(counter, Counter):
-        raise TypeError
-    return Cipher.AES.new(key, Cipher.AES.MODE_CTR, counter=counter)
-
-def toMpi(n):
-    return toData(long_to_bytes(n))
-
-def toData(s):
-    return struct.pack(b'!I', len(s)) + s
-
-def fromMpi(data):
-    size, data = proto.unpack(b'!I', data)
-    return bytes_to_long(data[:size]), data[size:]
-
 class DH(object):
     __slots__ = ['priv', 'pub']
     @classmethod
@@ -135,121 +57,6 @@ class DH(object):
         self.pub = pow(self.gen, self.priv, self.prime)
 
 DH.set_params(DH1536_MODULUS, DH1536_GENERATOR)
-
-pkTypes = {}
-def registerkeytype(cls):
-    if not hasattr(cls, 'parsePayload'):
-        raise TypeError('registered key types need parsePayload()')
-    pkTypes[cls.pubkeyType] = cls
-    return cls
-
-class PK(object):
-    __slots__ = []
-    def sign(self, data):
-        raise NotImplementedError
-    def verify(self, data):
-        raise NotImplementedError
-    def fingerprint(self):
-        raise NotImplementedError
-    def serializePublicKey(self):
-        raise NotImplementedError
-
-    def cfingerprint(self):
-        return '{0:040x}'.format(bytes_to_long(self.fingerprint()))
-
-    @staticmethod
-    def parse(data):
-        typeid, data = proto.unpack(b'!H', data)
-        cls = pkTypes.get(typeid, None)
-        if cls is None:
-            raise NotImplementedError('unknown typeid %r' % typeid)
-        logging.debug('Got key of type %r' % cls)
-        return cls.parsePayload(data)
-
-    def __str__(self):
-        return human_hash(self.cfingerprint())
-    def __repr__(self):
-        return '<{cls}(fpr=\'{fpr}\')>'.format(
-                cls=self.__class__.__name__, fpr=str(self))
-
-@registerkeytype
-class DSAKey(PK):
-    __slots__ = ['priv', 'pub']
-    pubkeyType = 0x0000
-
-    def __init__(self, key=None):
-        self.priv = self.pub = None
-        if isinstance(key, tuple):
-            if len(key) == 5:
-                self.priv = DSA.construct(key)
-                self.pub = self.priv.publickey()
-            if len(key) == 4:
-                self.pub = DSA.construct(key)
-        elif isinstance(key, DSA._DSAobj):
-            if key.has_private():
-                self.priv = key
-                self.pub = self.priv.publickey()
-            else:
-                self.pub = key
-
-        if self.priv is None and self.pub is None:
-            raise TypeError('DSA object or 4/5-tuple required for key')
-
-    def serializePublicKey(self):
-        return struct.pack(b'!H', self.pubkeyType) + \
-                self.getPayload()
-
-    def getPayload(self):
-        return toMpi(self.pub.p) + toMpi(self.pub.q) + \
-                toMpi(self.pub.g) + toMpi(self.pub.y)
-
-    def fingerprint(self):
-        return SHA1(self.getPayload())
-
-    def sign(self, data):
-        # 2 <= K <= q = 160bit = 20 byte
-        K = bytes_to_long(RNG.read(19)) + 2
-        r, s = self.priv.sign(data, K)
-        return long_to_bytes(r) + long_to_bytes(s)
-
-    def verify(self, data, sig):
-        r, s = bytes_to_long(sig[:20]), bytes_to_long(sig[20:])
-        return self.pub.verify(data, (r,s))
-
-    def __hash__(self):
-        return bytes_to_long(self.fingerprint())
-
-    def __eq__(self, other):
-        if not isinstance(other, type(self)):
-            return False
-        return self.fingerprint() == other.fingerprint()
-
-    def __ne__(self, other):
-        return not (self == other)
-
-    def __getstate__(self):
-        if self.priv is not None:
-            return (self.priv.y, self.priv.g, self.priv.p, self.priv.q,
-                    self.priv.x)
-        else:
-            return (self.priv.y, self.priv.g, self.priv.p, self.priv.q)
-
-    def __setstate__(self, d):
-        self.__init__(d)
-
-    @classmethod
-    def generate(cls):
-        privkey = DSA.generate(1024)
-        return cls((privkey.key.y, privkey.key.g, privkey.key.p, privkey.key.q,
-                privkey.key.x))
-
-    @classmethod
-    def parsePayload(cls, data):
-        p, data = fromMpi(data)
-        q, data = fromMpi(data)
-        g, data = fromMpi(data)
-        y, data = fromMpi(data)
-        return cls((y, g, p, q)), data
 
 class DHSession(object):
     __slots__ = ['sendenc', 'sendmac', 'rcvenc', 'rcvmac', 'sendctr', 'rcvctr',
@@ -272,7 +79,7 @@ class DHSession(object):
     @classmethod
     def create(cls, dh, y):
         s = pow(y, dh.priv, DH1536_MODULUS)
-        sb = toMpi(s)
+        sb = pack_mpi(s)
 
         if dh.pub > y:
             sendbyte = b'\1'
@@ -537,7 +344,7 @@ class AuthKeyExchange(object):
     def startAKE(self):
         self.r = RNG.read(16)
 
-        gxmpi = toMpi(self.dh.pub)
+        gxmpi = pack_mpi(self.dh.pub)
 
         self.hashgx = SHA256(gxmpi)
         self.encgx = AESCTR(self.r).encrypt(gxmpi)
@@ -594,7 +401,7 @@ class AuthKeyExchange(object):
                     self.r, self.hashgx, SHA256(gxmpi), gxmpi)
             raise InvalidParameterError
 
-        self.gy = fromMpi(gxmpi)[0]
+        self.gy = read_mpi(gxmpi)[0]
         self.createAuthKeys()
 
         if msg.mac != SHA256HMAC160(self.mac_m2, msg.getMacedData()):
@@ -637,7 +444,7 @@ class AuthKeyExchange(object):
 
     def createAuthKeys(self):
         s = pow(self.gy, self.dh.priv, DH1536_MODULUS)
-        sbyte = toMpi(s)
+        sbyte = pack_mpi(s)
         self.sessionId = SHA256(b'\0' + sbyte)[:8]
         enc = SHA256(b'\1' + sbyte)
         self.enc_c, self.enc_cp = enc[:16], enc[16:]
@@ -648,8 +455,8 @@ class AuthKeyExchange(object):
 
     def calculatePubkeyAuth(self, key, mackey):
         pubkey = self.privkey.serializePublicKey()
-        buf = toMpi(self.dh.pub)
-        buf += toMpi(self.gy)
+        buf = pack_mpi(self.dh.pub)
+        buf += pack_mpi(self.gy)
         buf += pubkey
         buf += struct.pack(b'!I', self.ourKeyid)
         MB = self.privkey.sign(SHA256HMAC(mackey, buf))
@@ -661,14 +468,14 @@ class AuthKeyExchange(object):
 
     def checkPubkeyAuth(self, key, mackey, encsig):
         auth = AESCTR(key).decrypt(encsig)
-        self.theirPubkey, auth = PK.parse(auth)
+        self.theirPubkey, auth = PK.parsePublicKey(auth)
 
         receivedKeyid, auth = proto.unpack(b'!I', auth)
         if receivedKeyid == 0:
             raise InvalidParameterError
 
-        authbuf = toMpi(self.gy)
-        authbuf += toMpi(self.dh.pub)
+        authbuf = pack_mpi(self.gy)
+        authbuf += pack_mpi(self.dh.pub)
         authbuf += self.theirPubkey.serializePublicKey()
         authbuf += struct.pack(b'!I', receivedKeyid)
 
@@ -917,7 +724,7 @@ class SMPHandler:
                 * pow(self.g2, r2, DH1536_MODULUS) % DH1536_MODULUS
         temp1 = pow(self.g3, r1, DH1536_MODULUS)
 
-        cb = SHA256(chr(v) + toMpi(temp1) + toMpi(temp2))
+        cb = SHA256(chr(v) + pack_mpi(temp1) + pack_mpi(temp2))
         c = bytes_to_long(cb)
 
         temp1 = r * c % SM_ORDER
@@ -936,7 +743,7 @@ class SMPHandler:
                 * pow(self.g2, d2, DH1536_MODULUS) \
                 * pow(q, c, DH1536_MODULUS) % DH1536_MODULUS
 
-        cprime = SHA256(chr(v) + toMpi(temp1) + toMpi(temp2))
+        cprime = SHA256(chr(v) + pack_mpi(temp1) + pack_mpi(temp2))
 
         return long_to_bytes(c) == cprime
 
@@ -945,7 +752,7 @@ class SMPHandler:
         temp1 = pow(self.g1, r, DH1536_MODULUS)
         temp2 = pow(self.qab, r, DH1536_MODULUS)
 
-        cb = SHA256(chr(v) + toMpi(temp1) + toMpi(temp2))
+        cb = SHA256(chr(v) + pack_mpi(temp1) + pack_mpi(temp2))
         c = bytes_to_long(cb)
         temp1 = self.x3 * c % SM_ORDER
         d = (r - temp1) % SM_ORDER
@@ -959,12 +766,12 @@ class SMPHandler:
         temp2 = pow(self.qab, d, DH1536_MODULUS) \
                 * pow(r, c, DH1536_MODULUS) % DH1536_MODULUS
 
-        cprime = SHA256(chr(v) + toMpi(temp1) + toMpi(temp2))
+        cprime = SHA256(chr(v) + pack_mpi(temp1) + pack_mpi(temp2))
         return long_to_bytes(c) == cprime
 
 def proof_known_log(g, x, v):
     r = bytes_to_long(RNG.read(192))
-    c = bytes_to_long(SHA256(chr(v) + toMpi(pow(g, r, DH1536_MODULUS))))
+    c = bytes_to_long(SHA256(chr(v) + pack_mpi(pow(g, r, DH1536_MODULUS))))
     temp = x * c % SM_ORDER
     return c, (r-temp) % SM_ORDER
 
@@ -972,7 +779,7 @@ def check_known_log(c, d, g, x, v):
     gd = pow(g, d, DH1536_MODULUS)
     xc = pow(x, c, DH1536_MODULUS)
     gdxc = gd * xc % DH1536_MODULUS
-    return SHA256(chr(v) + toMpi(gdxc)) == long_to_bytes(c)
+    return SHA256(chr(v) + pack_mpi(gdxc)) == long_to_bytes(c)
 
 def invMod(n):
     return pow(n, DH1536_MODULUS_2, DH1536_MODULUS)
