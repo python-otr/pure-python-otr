@@ -40,7 +40,7 @@ setup(
     author='Kjell Braden',
     author_email='afflux@pentabarf.de',
     url='http://python-otr.pentabarf.de',
-    packages=['potr'],
+    packages=['potr', 'potr.compatcrypto'],
     package_dir={'potr':'src/potr'},
 
     classifiers=[
