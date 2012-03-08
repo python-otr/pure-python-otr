@@ -23,6 +23,7 @@ import struct
 
 from potr.utils import human_hash, bytes_to_long, unpack, pack_mpi
 
+DEFAULT_KEYTYPE = 0x0000
 pkTypes = {}
 def registerkeytype(cls):
     if not hasattr(cls, 'parsePayload'):
@@ -30,8 +31,16 @@ def registerkeytype(cls):
     pkTypes[cls.keyType] = cls
     return cls
 
+def generateDefaultKey():
+    return pkTypes[DEFAULT_KEYTYPE].generate()
+
 class PK(object):
     __slots__ = []
+
+    @classmethod
+    def generate(cls):
+        raise NotImplementedError
+
     def sign(self, data):
         raise NotImplementedError
     def verify(self, data):

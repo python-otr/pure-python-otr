@@ -442,7 +442,7 @@ class Account(object):
             self.privkey = self.loadPrivkey()
         if self.privkey is None:
             if autogen is True:
-                self.privkey = crypt.DSAKey.generate()
+                self.privkey = crypt.generateDefaultKey()
                 self.savePrivkey()
             else:
                 raise LookupError
