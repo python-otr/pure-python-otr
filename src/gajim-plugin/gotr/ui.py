@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 ##    ui.py
 ##
-## Copyright (C) 2008-2010 Kjell Braden <fnord@pentabarf.de>
+## Copyright 2008-2012 Kjell Braden <afflux@pentabarf.de>
 ##
 ## This file is part of Gajim.
 ##
