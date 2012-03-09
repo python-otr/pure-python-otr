@@ -1,4 +1,14 @@
-1.0.0beta3 (2011-??-??)
+1.0.0beta4 (2012-03-10)
+ - py3k support
+ - dropped soome debugging
+ - a new test suite
+ - added abstraction between the crypto lib 
+ -> API changes:
+   - this requires a different handling of PK objects - they cannot be
+     pickled anymore. Use parsePrivateKey and serializePrivateKey methods
+     and write their contents to files.
+
+1.0.0beta3 (unreleased)
  - don't always generate a privkey if none available
 
 1.0.0beta2 (2011-08-30)
