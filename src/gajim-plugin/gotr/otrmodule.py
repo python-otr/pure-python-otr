@@ -158,7 +158,7 @@ class GajimOtrAccount(potr.context.Account):
 
     def loadPrivkey(self):
         try:
-            with open(self.keyFilePath + '.key2', 'rb') as keyFile:
+            with open(self.keyFilePath + '.key3', 'rb') as keyFile:
                 return potr.crypt.PK.parsePrivateKey(keyFile.read())[0]
         except IOError, e:
             if e.errno != 2:
