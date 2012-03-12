@@ -479,18 +479,18 @@ class OtrPlugin(GajimPlugin):
                     'jid': event.fjid, 'error': e},
                     account, event.fjid)
             return IGNORE
+
+        if ctx is not None:
+            ctx.smpWindow.handle_tlv(tlvs)
+        if not msgtxt:
+            return IGNORE
+
         event.msgtxt = unicode(msgtxt)
         event.stanza.setBody(event.msgtxt)
 
         html_node = event.stanza.getTag('html')
         if html_node:
             event.stanza.delChild(html_node)
-
-        if ctx is not None:
-            ctx.smpWindow.handle_tlv(tlvs)
-
-        if not msgtxt:
-            return IGNORE
 
         return PASS
 

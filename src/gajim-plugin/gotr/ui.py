@@ -214,6 +214,7 @@ class ContactOtrSmpWindow:
 
     def __init__(self, ctx):
         self.question = None
+        self.smp_running = False
         self.ctx = ctx
         self.account = ctx.user.accountname
 
@@ -331,18 +332,19 @@ class ContactOtrSmpWindow:
         if tlvs:
             is1qtlv = self.get_tlv(tlvs, potr.proto.SMP1QTLV)
             # check for TLV_SMP_ABORT or state = CHEATED
-            if not self.ctx.smpIsValid():
-                self._abort()
+            if self.smp_running and not self.ctx.smpIsValid():
                 self._finish(_('SMP verifying aborted'))
 
             # check for TLV_SMP1
             elif self.get_tlv(tlvs, potr.proto.SMP1TLV):
+                self.smp_running = True
                 self.question = None
                 self.show(True)
                 self.gw('progressbar').set_fraction(0.3)
 
             # check for TLV_SMP1Q
             elif is1qtlv:
+                self.smp_running = True
                 self.question = is1qtlv.msg
                 self.show(True)
                 self.gw('progressbar').set_fraction(0.3)
