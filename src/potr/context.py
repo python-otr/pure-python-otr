@@ -62,13 +62,12 @@ OFFER_ACCEPTED = 3
 class Context(object):
     __slots__ = ['user', 'policy', 'crypto', 'tagOffer', 'lastSend',
             'lastMessage', 'mayRetransmit', 'fragment', 'fragmentInfo', 'state',
-            'inject', 'trust', 'peer']
+            'inject', 'trust', 'peer', 'trustName']
 
     def __init__(self, account, peername):
         self.user = account
         self.peer = peername
         self.policy = {}
-        self.trust = {}
         self.crypto = crypt.CryptEngine(self)
         self.discardFragment()
         self.tagOffer = OFFER_NOTSENT
@@ -76,6 +75,7 @@ class Context(object):
         self.lastSend = 0
         self.lastMessage = None
         self.state = STATE_PLAINTEXT
+        self.trustName = self.peer
 
     def getPolicy(self, key):
         raise NotImplementedError
@@ -132,8 +132,7 @@ class Context(object):
         return None
 
     def removeFingerprint(self, fingerprint):
-        if fingerprint in self.trust:
-            del self.trust[fingerprint]
+        self.user.removeFingerprint(self.trustName, fingerprint)
 
     def setTrust(self, fingerprint, trustLevel):
         ''' sets the trust level for the given fingerprint.
@@ -141,14 +140,13 @@ class Context(object):
             - the empty string for known but untrusted keys
             - 'verified' for manually verified keys
             - 'smp' for smp-style verified keys '''
-        self.trust[fingerprint] = trustLevel
+        self.user.setTrust(self.trustName, fingerprint, trustLevel)
 
-    def getTrust(self, fingerprint):
-        return self.trust.get(fingerprint, None)
+    def getTrust(self, fingerprint, default=None):
+        return self.user.getTrust(self.trustName, fingerprint, default)
 
     def setCurrentTrust(self, trustLevel):
         self.setTrust(self.crypto.theirPubkey.cfingerprint(), trustLevel)
-        self.user.saveTrusts()
 
     def getCurrentKey(self):
         return self.crypto.theirPubkey
@@ -161,7 +159,7 @@ class Context(object):
             - an empty string if the key is untrusted '''
         if self.crypto.theirPubkey is None:
             return None
-        return self.trust.get(self.crypto.theirPubkey.cfingerprint(), None)
+        return self.getTrust(self.crypto.theirPubkey.cfingerprint(), None)
 
     def receiveMessage(self, messageData, appdata=None):
         IGN = None, []
@@ -427,6 +425,7 @@ class Account(object):
         self.policy = {}
         self.protocol = protocol
         self.ctxs = {}
+        self.trusts = {}
         self.maxMessageSize = maxMessageSize
         self.defaultQuery = b'?OTRv{versions}?\n{accountname} has requested ' \
                 b'an Off-the-Record private conversation.  However, you ' \
@@ -467,6 +466,21 @@ class Account(object):
     def getDefaultQueryMessage(self, policy):
         v  = b'2' if policy('ALLOW_V2') else b''
         return self.defaultQuery.format(accountname=self.name, versions=v)
+
+    def setTrust(self, key, fingerprint, trustLevel):
+        if key not in self.trusts:
+            self.trusts[key] = {}
+        self.trusts[key][fingerprint] = trustLevel
+        self.saveTrusts()
+
+    def getTrust(self, key, fingerprint, default=None):
+        if key not in self.trusts:
+            return default
+        return self.trusts[key].get(fingerprint, default)
+
+    def removeFingerprint(self, key, fingerprint):
+        if key in self.trusts and fingerprint in self.trusts[key]:
+            del self.trusts[key][fingerprint]
 
 class NotEncryptedError(RuntimeError):
     pass
