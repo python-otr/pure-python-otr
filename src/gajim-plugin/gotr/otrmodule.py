@@ -24,12 +24,12 @@
 Off-The-Record encryption plugin.
 
 :author: Kjell self.Braden <kb.otr@pentabarf.de>
-:since: 20 May 2011
-:copyright: Copyright (2011) Kjell Braden <kb.otr@pentabarf.de>
+:since: 2008
+:copyright: Copyright 2008-2012 Kjell Braden <afflux@pentabarf.de>
 :license: GPL
 '''
 
-MINVERSION = (1,0,0,'beta4')
+MINVERSION = (1,0,0,'beta5')
 IGNORE = True
 PASS = False
 
@@ -493,22 +493,31 @@ class OtrPlugin(GajimPlugin):
             ctx = self.us[account].getContext(event.fjid)
             msgtxt, tlvs = ctx.receiveMessage(event.msgtxt,
                             appdata={'session':event.session})
+        except potr.context.NotOTRMessage, e:
+            # received message was not OTR - pass it on
+            return PASS
         except potr.context.UnencryptedMessage, e:
+            # we are encrypted but got some plaintext
+            # display it with a warning
             tlvs = []
             msgtxt = _('The following message received from %(jid)s was '
                     '*not encrypted*: [%(error)s]') % {'jid': event.fjid,
                     'error': e.args[0]}
         except potr.context.NotEncryptedError, e:
+            # we got some encrypted data
+            # but we don't have an encrypted session
             self.gajim_log(_('The encrypted message received from %s is '
                     'unreadable, as you are not currently communicating '
                     'privately') % event.fjid, account, event.fjid)
             return IGNORE
         except potr.context.ErrorReceived, e:
+            # got a protocol error
             self.gajim_log(_('We received the following OTR error '
                     'message from %(jid)s: [%(error)s]') % {'jid': event.fjid,
                     'error': e.args[0].error})
             return IGNORE
         except RuntimeError, e:
+            # generic library bug?
             self.gajim_log(_('The following error occurred when trying to '
                     'decrypt a message from %(jid)s: [%(error)s]') % {
                     'jid': event.fjid, 'error': e},
@@ -517,12 +526,12 @@ class OtrPlugin(GajimPlugin):
 
         if ctx is not None:
             ctx.smpWindow.handle_tlv(tlvs)
-        if not msgtxt:
-            return IGNORE
 
-        event.msgtxt = unicode(msgtxt)
+        event.msgtxt = unicode(msgtxt or '')
         event.stanza.setBody(event.msgtxt)
 
+        # every message that went through OTR (ie. was OTR-related) gets
+        # stripped from html. I don't like html.
         html_node = event.stanza.getTag('html')
         if html_node:
             event.stanza.delChild(html_node)

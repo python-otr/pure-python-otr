@@ -1,3 +1,14 @@
+1.0.0beta5 (2012-03-29)
+ - gotr: bugfix: plugin broke gajim's ressource discovery (issue #7)
+ - gotr: store the fingerprints per user, not per ressource (issue #6)
+ - gotr: add activate() (merge with hg.gajim.org, issue #5)
+ - gotr: bugfix in smp/disconnect handling
+ -> API changes:
+   - added trustName field to Context, allows applications to specify custom
+     names for the fingerprint storage.
+     (eg. use jid while context uses jid+ressource)
+   - non-OTR messages raise NotOTRMessage
+
 1.0.0beta4 (2012-03-10)
  - py3k support
  - dropped soome debugging

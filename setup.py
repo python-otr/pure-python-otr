@@ -35,7 +35,7 @@ class checked_install_lib(install_lib):
 
 setup(
     name='python-potr',
-    version='1.0.0b4',
+    version='1.0.0b5',
     description='pure Python Off-The-Record encryption',
     author='Kjell Braden',
     author_email='afflux@pentabarf.de',

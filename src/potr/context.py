@@ -177,8 +177,11 @@ class Context(object):
 
         if self.getPolicy('SEND_TAG'):
             if isinstance(message, basestring):
+                # received a plaintext message without tag
+                # we should not tag anymore
                 self.tagOffer = OFFER_REJECTED
             else:
+                # got something OTR-ish, cool!
                 self.tagOffer = OFFER_ACCEPTED
 
         if isinstance(message, proto.Query):
@@ -229,7 +232,7 @@ class Context(object):
         if isinstance(message, proto.Error):
             raise ErrorReceived(message)
 
-        return message, []
+        raise NotOTRMessage(message)
 
     def sendInternal(self, msg, tlvs=[], appdata=None):
         if isinstance(msg, basestring):
@@ -487,4 +490,6 @@ class NotEncryptedError(RuntimeError):
 class UnencryptedMessage(RuntimeError):
     pass
 class ErrorReceived(RuntimeError):
+    pass
+class NotOTRMessage(RuntimeError):
     pass
