@@ -97,11 +97,11 @@ class GajimContext(potr.context.Context):
         account = self.user.accountname
 
         stanza = common.xmpp.Message(to=self.peer, body=msg, typ='chat')
-        if appdata and 'session' in appdata:
-            session = appdata['session']
-            stanza.setThread(session.thread_id)
+        if appdata is not None:
+            session = appdata.get('session', None)
+            if session is not None:
+                stanza.setThread(session.thread_id)
         gajim.connections[account].connection.send(stanza, now=True)
-        return
 
     def setState(self, newstate):
         if self.state == potr.context.STATE_ENCRYPTED:
