@@ -250,7 +250,7 @@ class Context(object):
 
     def processOutgoingMessage(self, msg, flags, tlvs=[]):
         if isinstance(self.parse(msg), proto.Query):
-            msg = self.user.getDefaultQueryMessage(self.getPolicy)
+            return self.user.getDefaultQueryMessage(self.getPolicy)
 
         if self.state == STATE_PLAINTEXT:
             if self.getPolicy('REQUIRE_ENCRYPTION'):
