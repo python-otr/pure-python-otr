@@ -289,7 +289,7 @@ class OtrPlugin(GajimPlugin):
                 ui.get_otr_submenu(self, cc).get_submenu().popup(None,
                         None, None, 0, 0)
             else:
-                cc._on_authentication_button_clicked(cc, widget)
+                cc._on_authentication_button_clicked(widget)
         self.overwrite_handler(cc, cc.authentication_button, authbutton_cb)
 
         # hijack context menu
