@@ -66,7 +66,6 @@
                             <property name="label" translatable="yes">&lt;tt&gt;-------- -------- -------- -------- --------	&lt;/tt&gt;</property>
                             <property name="use_markup">True</property>
                             <property name="selectable">True</property>
-                            <property name="ellipsize">end</property>
                           </object>
                           <packing>
                             <property name="position">1</property>
