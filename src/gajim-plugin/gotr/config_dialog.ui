@@ -245,6 +245,7 @@
                 <property name="model">fingerprint_store</property>
                 <property name="search_column">0</property>
                 <property name="tooltip_column">5</property>
+                <signal name="button-press-event" handler="fpr_button_pressed_cb" swapped="no"/>
                 <child>
                   <object class="GtkTreeViewColumn" id="name_column">
                     <property name="resizable">True</property>
