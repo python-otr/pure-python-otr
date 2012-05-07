@@ -85,6 +85,7 @@ class checked_install_lib(install_lib):
 
         if os.path.isdir(self.build_dir):
             for package in self.packages:
+                packagedir = os.path.join(*list(package.split('.')))
                 if package == 'gotr':
                     if os.path.isdir(self.gajim_dir):
                         outfiles += self.copy_tree(
@@ -92,8 +93,8 @@ class checked_install_lib(install_lib):
                                 self.gajim_plugin_dir)
                 else:
                     outfiles += self.copy_tree(
-                            os.path.join(self.build_dir, package),
-                            os.path.join(self.install_dir, package))
+                            os.path.join(self.build_dir, packagedir),
+                            os.path.join(self.install_dir, packagedir))
         else:
             self.warn("'%s' does not exist -- no Python modules to install" %
                       self.build_dir)
