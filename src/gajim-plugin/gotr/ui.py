@@ -46,7 +46,7 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
 
         fpr_view = self.B.get_object('fingerprint_view')
         fpr_view.set_model(self.fpr_model)
-        fpr_view.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+        fpr_view.get_selection().set_mode(gtk.SELECTION_SINGLE)
 
         if len(self.otr_account_store) > 0:
             self.B.get_object('account_combobox').set_active(0)
@@ -68,6 +68,30 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
     def on_run(self):
         self.plugin.update_context_list()
         self.account_combobox_changed_cb(self.B.get_object('account_combobox'))
+
+    def fpr_button_pressed_cb(self, treeview, event):
+        if event.button == 3:
+            x = int(event.x)
+            y = int(event.y)
+            time = event.time
+            pthinfo = treeview.get_path_at_pos(x, y)
+            if pthinfo is not None:
+                path, col, cellx, celly = pthinfo
+                treeview.grab_focus()
+                treeview.set_cursor( path, col, 0)
+                pop = gtk.Menu()
+                copy = gtk.MenuItem(label="Copy to clipboard")
+                copy.connect('activate', self.clipboard_button_cb, treeview)
+                pop.append(copy)
+                copy.show()
+                pop.popup( None, None, None, event.button, time)
+                return True
+
+    def clipboard_button_cb(bla, boo, treeview):
+        ele, iter = treeview.get_selection().get_selected()
+        jid = ele.get_value(iter, 0)
+        fpr = ele.get_value(iter, 3)
+        clipboard = gtk.Clipboard(selection="PRIMARY").set_text(jid + ": " + fpr[4:-5], len(jid) + len(fpr) - 6)
 
     def flags_toggled_cb(self, button):
         if button == self.B.get_object('enable_check'):
