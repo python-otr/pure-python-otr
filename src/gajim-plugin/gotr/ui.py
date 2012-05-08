@@ -44,9 +44,9 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
         for account in sorted(gajim.contacts.get_accounts()):
             self.otr_account_store.append(row=(account,))
 
-        fpr_view = self.B.get_object('fingerprint_view')
-        fpr_view.set_model(self.fpr_model)
-        fpr_view.get_selection().set_mode(gtk.SELECTION_SINGLE)
+        self.fpr_view = self.B.get_object('fingerprint_view')
+        self.fpr_view.set_model(self.fpr_model)
+        self.fpr_view.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
         if len(self.otr_account_store) > 0:
             self.B.get_object('account_combobox').set_active(0)
@@ -69,30 +69,37 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
         self.plugin.update_context_list()
         self.account_combobox_changed_cb(self.B.get_object('account_combobox'))
 
-    def fpr_button_pressed_cb(self, treeview, event):
+    def fpr_button_pressed_cb(self, tw, event):
         if event.button == 3:
-            x = int(event.x)
-            y = int(event.y)
-            time = event.time
-            pthinfo = treeview.get_path_at_pos(x, y)
-            if pthinfo is not None:
-                path, col, cellx, celly = pthinfo
-                treeview.grab_focus()
-                treeview.set_cursor( path, col, 0)
-                pop = gtk.Menu()
-                copy = gtk.MenuItem(label="Copy to clipboard")
-                copy.connect('activate', self.clipboard_button_cb, treeview)
-                pop.append(copy)
-                copy.show()
-                pop.popup( None, None, None, event.button, time)
-                return True
+            pthinfo = tw.get_path_at_pos(int(event.x), int(event.y))
 
-    def clipboard_button_cb(bla, boo, treeview):
-        ele, iter = treeview.get_selection().get_selected()
-        jid = ele.get_value(iter, 0)
-        fpr = ele.get_value(iter, 3)
-        clipboard = gtk.Clipboard(selection="PRIMARY").set_text(jid + ": " + fpr[4:-5], len(jid) + len(fpr) - 6)
+            if pthinfo is None:
+                # only show the popup when we right clicked on list content
+                # ie. don't show it when we click at empty rows
+                return False
 
+            # if the row under the mouse is already selected, we keep the
+            # selection, otherwise we only select the new item
+            keep_selection = tw.get_selection().path_is_selected(pthinfo[0])
+
+            pop = self.B.get_object('fprclipboard_menu')
+            pop.popup(None, None, None, event.button, event.time)
+
+            # keep_selection=True -> no further processing of click event
+            # keep_selection=False-> further processing -> GTK usually selects
+            #   the item below the cursor
+            return keep_selection
+
+    def clipboard_button_cb(self, menuitem):
+        mod, paths = self.fpr_view.get_selection().get_selected_rows()
+
+        fprs = []
+        for path in paths:
+            it = mod.get_iter(path)
+            jid, fpr = mod.get(it, 0, 6)
+            fprs.append('%s: %s' % (jid, potr.human_hash(fpr)))
+        gtk.Clipboard(selection='PRIMARY').set_text('\n'.join(fprs))
+        
     def flags_toggled_cb(self, button):
         if button == self.B.get_object('enable_check'):
             new_status = button.get_active()
@@ -146,9 +153,8 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
         for acc in gajim.connections.iterkeys():
             accounts[gajim.get_jid_from_account(acc)] = acc
 
-        tw = self.B.get_object('fingerprint_view')
 
-        mod, paths = tw.get_selection().get_selected_rows()
+        mod, paths = self.fpr_view.get_selection().get_selected_rows()
 
         for path in paths:
             it = mod.get_iter(path)
@@ -180,9 +186,7 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
         for acc in gajim.connections.iterkeys():
             accounts[gajim.get_jid_from_account(acc)] = acc
 
-        tw = self.B.get_object('fingerprint_view')
-
-        mod, paths = tw.get_selection().get_selected_rows()
+        mod, paths = self.fpr_view.get_selection().get_selected_rows()
 
         # open the window for the first selected row
         for path in paths[0:1]:

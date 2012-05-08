@@ -24,6 +24,21 @@
       <column type="gchararray"/>
     </columns>
   </object>
+  <object class="GtkMenu" id="fprclipboard_menu">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="ubuntu_local">True</property>
+    <child>
+      <object class="GtkMenuItem" id="copyfprclipboard_item">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="use_action_appearance">False</property>
+        <property name="label" translatable="yes">Copy to clipboard</property>
+        <property name="use_underline">True</property>
+        <signal name="activate" handler="clipboard_button_cb"/>
+      </object>
+    </child>
+  </object>
   <object class="GtkNotebook" id="notebook1">
     <property name="visible">True</property>
     <property name="can_focus">True</property>
