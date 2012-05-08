@@ -98,7 +98,7 @@ class OtrPluginConfigDialog(GajimPluginConfigDialog):
             it = mod.get_iter(path)
             jid, fpr = mod.get(it, 0, 6)
             fprs.append('%s: %s' % (jid, potr.human_hash(fpr)))
-        gtk.Clipboard(selection='PRIMARY').set_text('\n'.join(fprs))
+        gtk.Clipboard().set_text('\n'.join(fprs))
         
     def flags_toggled_cb(self, button):
         if button == self.B.get_object('enable_check'):
