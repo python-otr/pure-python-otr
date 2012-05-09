@@ -27,6 +27,11 @@ the install commmand:
 After installing, the plugin must be manually enabled in the Gajim plugin
 interface.
 
+Reporting bugs
+==============
+Please read the [FAQ](/afflux/pure-python-otr/wiki) before submitting your
+issue to the [tracker](/afflux/pure-python-otr/issues).
+
 libotr SWIG bindings
 ====================
 python-otr.pentabarf.de and pyotr.pentabarf.de redirect here.
