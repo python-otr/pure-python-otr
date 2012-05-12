@@ -27,6 +27,7 @@ from potr.compatcrypto import SHA256, SHA1, HMAC, SHA1HMAC, SHA256HMAC, \
 from potr.utils import bytes_to_long, long_to_bytes, pack_mpi, read_mpi
 from potr import proto
 
+logger = logging.getLogger(__name__)
 
 STATE_NONE = 0
 STATE_AWAITING_DHKEY = 1
@@ -142,7 +143,7 @@ class CryptEngine(object):
         self.sessionkeys[0][1] = None if self.theirOldY is None else \
                 DHSession.create(self.ourDHKey, self.theirOldY)
 
-        logging.debug('{0}: Refreshing ourkey to {1} {2}'.format(
+        logger.debug('{0}: Refreshing ourkey to {1} {2}'.format(
                 self.ctx.user.name, self.ourKeyid, self.sessionkeys))
 
     def rotateYKeys(self, new_y):
@@ -156,7 +157,7 @@ class CryptEngine(object):
         self.sessionkeys[0][0] = DHSession.create(self.ourDHKey, self.theirY)
         self.sessionkeys[1][0] = DHSession.create(self.ourOldDHKey, self.theirY)
 
-        logging.debug('{0}: Refreshing theirkey to {1} {2}'.format(
+        logger.debug('{0}: Refreshing theirkey to {1} {2}'.format(
                 self.ctx.user.name, self.theirKeyid, self.sessionkeys))
 
     def handleDataMessage(self, msg):
@@ -166,24 +167,24 @@ class CryptEngine(object):
         sesskey = self.sessionkeys[self.ourKeyid - msg.rkeyid] \
                 [self.theirKeyid - msg.skeyid]
 
-        logging.debug('sesskeys: {0!r}, our={1}, r={2}, their={3}, s={4}' \
+        logger.debug('sesskeys: {0!r}, our={1}, r={2}, their={3}, s={4}' \
                 .format(self.sessionkeys, self.ourKeyid, msg.rkeyid,
                         self.theirKeyid, msg.skeyid))
 
         if msg.mac != SHA1HMAC(sesskey.rcvmac, msg.getMacedData()):
-            logging.error('HMACs don\'t match')
+            logger.error('HMACs don\'t match')
             raise InvalidParameterError
         sesskey.rcvmacused = 1
 
         newCtrPrefix = bytes_to_long(msg.ctr)
         if newCtrPrefix <= sesskey.rcvctr.prefix:
-            logging.error('CTR must increase (old %r, new %r)',
+            logger.error('CTR must increase (old %r, new %r)',
                     sesskey.rcvctr.prefix, newCtrPrefix)
             raise InvalidParameterError
 
         sesskey.rcvctr.prefix = newCtrPrefix
 
-        logging.debug('handle: enc={0!r} mac={1!r} ctr={2!r}' \
+        logger.debug('handle: enc={0!r} mac={1!r} ctr={2!r}' \
                 .format(sesskey.rcvenc, sesskey.rcvmac, sesskey.rcvctr))
 
         plaintextData = AESCTR(sesskey.rcvenc, sesskey.rcvctr) \
@@ -205,20 +206,20 @@ class CryptEngine(object):
 
     def smpSecret(self, secret, question=None, appdata=None):
         if self.smp is None:
-            logging.debug('Creating SMPHandler')
+            logger.debug('Creating SMPHandler')
             self.smp = SMPHandler(self)
 
         self.smp.gotSecret(secret, question=question, appdata=appdata)
 
     def smpHandle(self, tlv, appdata=None):
         if self.smp is None:
-            logging.debug('Creating SMPHandler')
+            logger.debug('Creating SMPHandler')
             self.smp = SMPHandler(self)
         self.smp.handle(tlv, appdata=appdata)
 
     def smpAbort(self, appdata=None):
         if self.smp is None:
-            logging.debug('Creating SMPHandler')
+            logger.debug('Creating SMPHandler')
             self.smp = SMPHandler(self)
         self.smp.abort(appdata=appdata)
 
@@ -230,7 +231,7 @@ class CryptEngine(object):
         sess = self.sessionkeys[1][0]
         sess.sendctr.inc()
 
-        logging.debug('create: enc={0!r} mac={1!r} ctr={2!r}' \
+        logger.debug('create: enc={0!r} mac={1!r} ctr={2!r}' \
                 .format(sess.sendenc, sess.sendmac, sess.sendctr))
 
         # plaintext + TLVS
@@ -290,7 +291,7 @@ class CryptEngine(object):
 
     def goEncrypted(self, ake):
         if ake.dh.pub == ake.gy:
-            logging.warning('We are receiving our own messages')
+            logger.warning('We are receiving our own messages')
             raise InvalidParameterError
 
         # TODO handle new fingerprint
@@ -310,7 +311,7 @@ class CryptEngine(object):
             self.rotateDHKeys()
 
         self.ctx._wentEncrypted()
-        logging.info('went encrypted with {0}'.format(self.theirPubkey))
+        logger.info('went encrypted with {0}'.format(self.theirPubkey))
 
     def finished(self):
         self.smp = None
@@ -366,7 +367,7 @@ class AuthKeyExchange(object):
 
             # check 2 <= g**y <= p-2
             if not check_group(self.gy):
-                logging.error('Invalid g**y received: %r', self.gy)
+                logger.error('Invalid g**y received: %r', self.gy)
                 return
 
             self.createAuthKeys()
@@ -381,23 +382,23 @@ class AuthKeyExchange(object):
             return self.lastmsg
 
         elif self.state == STATE_AWAITING_SIG:
-            logging.info('received DHKey while not awaiting DHKEY')
+            logger.info('received DHKey while not awaiting DHKEY')
             if msg.gy == self.gy:
-                logging.info('resending revealsig')
+                logger.info('resending revealsig')
                 return self.lastmsg
         else:
-            logging.info('bad state for DHKey')
+            logger.info('bad state for DHKey')
 
     def handleRevealSig(self, msg):
         if self.state != STATE_AWAITING_REVEALSIG:
-            logging.error('bad state for RevealSig')
+            logger.error('bad state for RevealSig')
             raise InvalidParameterError
 
         self.r = msg.rkey
         gxmpi = AESCTR(self.r).decrypt(self.encgx)
         if SHA256(gxmpi) != self.hashgx:
-            logging.error('Hashes don\'t match')
-            logging.info('r=%r, hashgx=%r, computed hash=%r, gxmpi=%r',
+            logger.error('Hashes don\'t match')
+            logger.info('r=%r, hashgx=%r, computed hash=%r, gxmpi=%r',
                     self.r, self.hashgx, SHA256(gxmpi), gxmpi)
             raise InvalidParameterError
 
@@ -405,8 +406,8 @@ class AuthKeyExchange(object):
         self.createAuthKeys()
 
         if msg.mac != SHA256HMAC160(self.mac_m2, msg.getMacedData()):
-            logging.error('HMACs don\'t match')
-            logging.info('mac=%r, mac_m2=%r, data=%r', msg.mac, self.mac_m2,
+            logger.error('HMACs don\'t match')
+            logger.info('mac=%r, mac_m2=%r, data=%r', msg.mac, self.mac_m2,
                     msg.getMacedData())
             raise InvalidParameterError
 
@@ -426,11 +427,11 @@ class AuthKeyExchange(object):
 
     def handleSignature(self, msg):
         if self.state != STATE_AWAITING_SIG:
-            logging.error('bad state (%d) for Signature', self.state)
+            logger.error('bad state (%d) for Signature', self.state)
             raise InvalidParameterError
 
         if msg.mac != SHA256HMAC160(self.mac_m2p, msg.getMacedData()):
-            logging.error('HMACs don\'t match')
+            logger.error('HMACs don\'t match')
             raise InvalidParameterError
 
         self.checkPubkeyAuth(self.enc_cp, self.mac_m1p, msg.encsig)
@@ -513,7 +514,7 @@ class SMPHandler:
         self.crypto.ctx.sendInternal(b'', tlvs=[tlv], appdata=appdata)
 
     def handle(self, tlv, appdata=None):
-        logging.debug('handling TLV {0.__class__.__name__}'.format(tlv))
+        logger.debug('handling TLV {0.__class__.__name__}'.format(tlv))
         self.prog = SMPPROG_CHEATED
         if isinstance(tlv, proto.SMPABORTTLV):
             self.state = 1
@@ -530,7 +531,7 @@ class SMPHandler:
                     or not check_exp(msg[2]) or not check_exp(msg[5]) \
                     or not check_known_log(msg[1], msg[2], self.g1, msg[0], 1) \
                     or not check_known_log(msg[4], msg[5], self.g1, msg[3], 2):
-                logging.error('invalid SMP1TLV received')
+                logger.error('invalid SMP1TLV received')
                 self.abort(appdata=appdata)
                 return
 
@@ -562,7 +563,7 @@ class SMPHandler:
                     or not check_exp(msg[9]) or not check_exp(msg[10]) \
                     or not check_known_log(msg[1], msg[2], self.g1, msg[0], 3) \
                     or not check_known_log(msg[4], msg[5], self.g1, msg[3], 4):
-                logging.error('invalid SMP2TLV received')
+                logger.error('invalid SMP2TLV received')
                 self.abort(appdata=appdata)
                 return
 
@@ -571,7 +572,7 @@ class SMPHandler:
             self.g3 = pow(msg[3], self.x3, DH1536_MODULUS)
 
             if not self.check_equal_coords(msg[6:11], 5):
-                logging.error('invalid SMP2TLV received')
+                logger.error('invalid SMP2TLV received')
                 self.abort(appdata=appdata)
                 return
 
@@ -607,7 +608,7 @@ class SMPHandler:
                     or not check_group(msg[5]) or not check_exp(msg[3]) \
                     or not check_exp(msg[4]) or not check_exp(msg[7]) \
                     or not self.check_equal_coords(msg[:5], 6):
-                logging.error('invalid SMP3TLV received')
+                logger.error('invalid SMP3TLV received')
                 self.abort(appdata=appdata)
                 return
 
@@ -617,7 +618,7 @@ class SMPHandler:
             self.qab = msg[1] * inv % DH1536_MODULUS
 
             if not self.check_equal_logs(msg[5:8], 7):
-                logging.error('invalid SMP3TLV received')
+                logger.error('invalid SMP3TLV received')
                 self.abort(appdata=appdata)
                 return
 
@@ -629,12 +630,12 @@ class SMPHandler:
             self.prog = SMPPROG_SUCCEEDED if self.pab == rab else SMPPROG_FAILED
 
             if self.prog != SMPPROG_SUCCEEDED:
-                logging.error('secrets don\'t match')
+                logger.error('secrets don\'t match')
                 self.abort(appdata=appdata)
                 self.crypto.ctx.setCurrentTrust('')
                 return
 
-            logging.info('secrets matched')
+            logger.info('secrets matched')
             if not self.questionReceived:
                 self.crypto.ctx.setCurrentTrust('smp')
             self.state = 1
@@ -649,7 +650,7 @@ class SMPHandler:
 
             if not check_group(msg[0]) or not check_exp(msg[2]) \
                     or not self.check_equal_logs(msg[:3], 8):
-                logging.error('invalid SMP4TLV received')
+                logger.error('invalid SMP4TLV received')
                 self.abort(appdata=appdata)
                 return
 
@@ -658,12 +659,12 @@ class SMPHandler:
             self.prog = SMPPROG_SUCCEEDED if self.pab == rab else SMPPROG_FAILED
 
             if self.prog != SMPPROG_SUCCEEDED:
-                logging.error('secrets don\'t match')
+                logger.error('secrets don\'t match')
                 self.abort(appdata=appdata)
                 self.crypto.ctx.setCurrentTrust('')
                 return
 
-            logging.info('secrets matched')
+            logger.info('secrets matched')
             self.crypto.ctx.setCurrentTrust('smp')
             self.state = 1
             return

@@ -38,6 +38,8 @@ import base64
 import logging
 import struct
 
+logger = logging.getLogger(__name__)
+
 from potr import crypt
 from potr import proto
 
@@ -97,7 +99,7 @@ class Context(object):
 
         params = message.split(b',')
         if len(params) < 5 or not params[1].isdigit() or not params[2].isdigit():
-            logging.warning('invalid formed fragmented message: %r', params)
+            logger.warning('invalid formed fragmented message: %r', params)
             return None
 
 
@@ -107,7 +109,7 @@ class Context(object):
         n = int(params[2])
         fragData = params[3]
 
-        logging.debug(params)
+        logger.debug(params)
 
         if n >= k == 1:
             # first fragment
@@ -121,7 +123,7 @@ class Context(object):
         else:
             # bad, discard
             self.discardFragment()
-            logging.warning('invalid fragmented message: %r', params)
+            logger.warning('invalid fragmented message: %r', params)
             return None
 
         if n == k > 0:
@@ -173,7 +175,7 @@ class Context(object):
             # nothing to see. move along.
             return IGN
 
-        logging.debug(repr(message))
+        logger.debug(repr(message))
 
         if self.getPolicy('SEND_TAG'):
             if isinstance(message, basestring):
@@ -222,7 +224,7 @@ class Context(object):
             except crypt.InvalidParameterError:
                 if ignore:
                     return IGN
-                logging.exception('decryption failed')
+                logger.exception('decryption failed')
                 raise
         if isinstance(message, basestring):
             if self.state != STATE_PLAINTEXT or \
@@ -339,7 +341,7 @@ class Context(object):
     def processTLVs(self, tlvs, appdata=None):
         for tlv in tlvs:
             if isinstance(tlv, proto.DisconnectTLV):
-                logging.info('got disconnect tlv, forcing finished state')
+                logger.info('got disconnect tlv, forcing finished state')
                 self.setState(STATE_FINISHED)
                 self.crypto.finished()
                 # TODO cleanup
@@ -347,7 +349,7 @@ class Context(object):
             if isinstance(tlv, proto.SMPTLV):
                 self.crypto.smpHandle(tlv, appdata=appdata)
                 continue
-            logging.info('got unhandled tlv: {0!r}'.format(tlv))
+            logger.info('got unhandled tlv: {0!r}'.format(tlv))
 
     def smpAbort(self, appdata=None):
         if self.state != STATE_ENCRYPTED:
@@ -422,7 +424,7 @@ class Context(object):
             cls = proto.messageClasses.get(classInfo, None)
             if cls is None:
                 return message
-            logging.debug('{user} got msg {typ!r}' \
+            logger.debug('{user} got msg {typ!r}' \
                     .format(user=self.user.name, typ=cls))
             return cls.parsePayload(message[indexBase+5:])
 
