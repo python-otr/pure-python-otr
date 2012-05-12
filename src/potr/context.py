@@ -288,10 +288,13 @@ class Context(object):
         self.setState(STATE_ENCRYPTED)
 
     def sendFragmented(self, sendPolicy, msg, appdata=None):
+        msg_bytes = bytes(msg)
+
         mms = self.user.maxMessageSize
-        msgLen = len(msg)
-        if mms != 0 and len(msg) > mms and self.policyOtrEnabled() \
-                and self.state == STATE_ENCRYPTED:
+        msgLen = len(msg_bytes)
+        if isinstance(msg, proto.OTRMessage) and mms != 0 and \
+                len(msg_bytes) > mms:
+            msg = msg_bytes
             fms = mms - 19
             fragments = [ msg[i:i+fms] for i in range(0, len(msg), fms) ]
 
