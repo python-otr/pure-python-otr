@@ -256,7 +256,7 @@ class CryptEngine(object):
     def startAKE(self, appdata=None):
         self.ake = AuthKeyExchange(self.ctx.user.getPrivkey(), self.goEncrypted)
         outMsg = self.ake.startAKE()
-        self.ctx.inject(outMsg, appdata=appdata)
+        self.ctx.sendInternal(outMsg, appdata=appdata)
 
     def handleAKE(self, inMsg, appdata=None):
         outMsg = None
@@ -286,7 +286,7 @@ class CryptEngine(object):
             self.ake.handleSignature(inMsg)
 
         if outMsg is not None:
-            self.ctx.inject(outMsg, appdata=appdata)
+            self.ctx.sendInternal(outMsg, appdata=appdata)
 
     def goEncrypted(self, ake):
         if ake.dh.pub == ake.gy:
@@ -510,9 +510,7 @@ class SMPHandler:
         self.sendTLV(proto.SMPABORTTLV(), appdata=appdata)
 
     def sendTLV(self, tlv, appdata=None):
-        self.crypto.ctx.inject(self.crypto.createDataMessage(b'',
-                flags=proto.MSGFLAGS_IGNORE_UNREADABLE, tlvs=[tlv]),
-                appdata=appdata)
+        self.crypto.ctx.sendInternal(b'', tlvs=[tlv], appdata=appdata)
 
     def handle(self, tlv, appdata=None):
         logging.debug('handling TLV {0.__class__.__name__}'.format(tlv))

@@ -235,18 +235,30 @@ class Context(object):
         raise NotOTRMessage(message)
 
     def sendInternal(self, msg, tlvs=[], appdata=None):
-        if isinstance(msg, basestring):
-            self.sendMessage(FRAGMENT_SEND_ALL, msg,
-                    flags=proto.MSGFLAGS_IGNORE_UNREADABLE, tlvs=tlvs,
-                    appdata=appdata)
-        else:
-            self.sendFragmented(FRAGMENT_SEND_ALL, bytes(msg), appdata=appdata)
+        self.sendMessage(FRAGMENT_SEND_ALL, msg, tlvs=tlvs, appdata=appdata,
+                flags=proto.MSGFLAGS_IGNORE_UNREADABLE)
 
     def sendMessage(self, sendPolicy, msg, flags=0, tlvs=[], appdata=None):
         if self.policyOtrEnabled():
             self.lastSend = time()
-            msg = bytes(self.processOutgoingMessage(msg, flags, tlvs))
-        return self.sendFragmented(sendPolicy, msg, appdata=appdata)
+
+            if isinstance(msg, proto.OTRMessage):
+                # we want to send a protocol message (probably internal)
+                # so we don't need further protocol encryption
+                # also we can't add TLVs to arbitrary protocol messages
+                if tlvs:
+                    raise TypeError('can\'t add tlvs to protocol message')
+            else:
+                # we got plaintext to send. encrypt it
+                msg = self.processOutgoingMessage(msg, flags, tlvs)
+
+            if isinstance(msg, proto.OTRMessage) \
+                    and not isinstance(msg, proto.Query):
+                # if it's a query message, it must not get fragmented
+                return self.sendFragmented(bytes(msg), policy=sendPolicy, appdata=appdata)
+            else:
+                msg = bytes(msg)
+        return msg
 
     def processOutgoingMessage(self, msg, flags, tlvs=[]):
         if isinstance(self.parse(msg), proto.Query):
@@ -287,11 +299,10 @@ class Context(object):
     def _wentEncrypted(self):
         self.setState(STATE_ENCRYPTED)
 
-    def sendFragmented(self, sendPolicy, msg, appdata=None):
+    def sendFragmented(self, msg, policy=FRAGMENT_SEND_ALL, appdata=None):
         mms = self.user.maxMessageSize
         msgLen = len(msg)
-        if mms != 0 and len(msg) > mms and self.policyOtrEnabled() \
-                and self.state == STATE_ENCRYPTED:
+        if mms != 0 and len(msg) > mms:
             fms = mms - 19
             fragments = [ msg[i:i+fms] for i in range(0, len(msg), fms) ]
 
@@ -305,21 +316,21 @@ class Context(object):
                 fragments[fi] = b'?OTR,' + ctr.encode('ascii') \
                         + fragments[fi] + b','
 
-            if sendPolicy == FRAGMENT_SEND_ALL:
+            if policy == FRAGMENT_SEND_ALL:
                 for f in fragments:
                     self.inject(f, appdata=appdata)
                 return None
-            elif sendPolicy == FRAGMENT_SEND_ALL_BUT_FIRST:
+            elif policy == FRAGMENT_SEND_ALL_BUT_FIRST:
                 for f in fragments[1:]:
                     self.inject(f, appdata=appdata)
                 return fragments[0]
-            elif sendPolicy == FRAGMENT_SEND_ALL_BUT_LAST:
+            elif policy == FRAGMENT_SEND_ALL_BUT_LAST:
                 for f in fragments[:-1]:
                     self.inject(f, appdata=appdata)
                 return fragments[-1]
 
         else:
-            if sendPolicy == FRAGMENT_SEND_ALL:
+            if policy == FRAGMENT_SEND_ALL:
                 self.inject(msg, appdata=appdata)
                 return None
             else:
