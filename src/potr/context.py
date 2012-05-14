@@ -302,7 +302,7 @@ class Context(object):
         self.setState(STATE_ENCRYPTED)
 
     def sendFragmented(self, msg, policy=FRAGMENT_SEND_ALL, appdata=None):
-        mms = self.user.maxMessageSize
+        mms = self.maxMessageSize(appdata)
         msgLen = len(msg)
         if mms != 0 and len(msg) > mms:
             fms = mms - 19
@@ -432,6 +432,10 @@ class Context(object):
             return proto.Error(message[indexBase+7:])
 
         return message
+
+    def maxMessageSize(self, appdata=None):
+        """Return the max message size for this context."""
+        return self.user.maxMessageSize
 
 class Account(object):
     contextclass = Context
