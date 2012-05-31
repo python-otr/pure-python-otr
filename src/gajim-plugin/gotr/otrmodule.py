@@ -24,12 +24,12 @@
 Off-The-Record encryption plugin.
 
 :author: Kjell self.Braden <kb.otr@pentabarf.de>
-:since: 20 May 2011
-:copyright: Copyright (2011) Kjell Braden <kb.otr@pentabarf.de>
+:since: 2008
+:copyright: Copyright 2008-2012 Kjell Braden <afflux@pentabarf.de>
 :license: GPL
 '''
 
-MINVERSION = (1,0,0,'beta4')
+MINVERSION = (1,0,0,'beta5')
 IGNORE = True
 PASS = False
 
@@ -55,6 +55,7 @@ inactive_tip = 'Communication to this contact is currently ' \
 
 import os
 import time
+import logging
 
 import common.xmpp
 from common import gajim
@@ -63,20 +64,38 @@ from common.connection_handlers_events import MessageOutgoingEvent
 from plugins import GajimPlugin
 from message_control import TYPE_CHAT, MessageControl
 from plugins.helpers import log_calls, log
+from plugins.plugin import GajimPluginException
 
 import ui
 
 
-import pickle
-import potr
-if not hasattr(potr, 'VERSION') or potr.VERSION < MINVERSION:
-    raise ImportError('old / unsupported python-otr version')
+HAS_POTR = True
+try:
+    import potr
+    if not hasattr(potr, 'VERSION') or potr.VERSION < MINVERSION:
+        raise ImportError('old / unsupported python-otr version')
+
+    potrrootlog = logging.getLogger('potr')
+    potrrootlog.handlers = []
+    potrrootlog.propagate = False
+    gajimrootlog = logging.getLogger('gajim')
+    for h in gajimrootlog.handlers:
+        potrrootlog.addHandler(h)
+except ImportError:
+    HAS_POTR = False
+
+def get_jid_from_fjid(fjid):
+    return gajim.get_room_and_nick_from_fjid(fjid)[0]
 
 class GajimContext(potr.context.Context):
-    __slots__ = ['smpWindow']
+    # self.peer is fjid
+    # self.jid does not contain resource
+    __slots__ = ['smpWindow', 'jid']
 
     def __init__(self, account, peer):
         super(GajimContext, self).__init__(account, peer)
+        self.jid = get_jid_from_fjid(peer)
+        self.trustName = self.jid
         self.smpWindow = ui.ContactOtrSmpWindow(self)
 
     def inject(self, msg, appdata=None):
@@ -85,11 +104,11 @@ class GajimContext(potr.context.Context):
         account = self.user.accountname
 
         stanza = common.xmpp.Message(to=self.peer, body=msg, typ='chat')
-        if appdata and 'session' in appdata:
-            session = appdata['session']
-            stanza.setThread(session.thread_id)
+        if appdata is not None:
+            session = appdata.get('session', None)
+            if session is not None:
+                stanza.setThread(session.thread_id)
         gajim.connections[account].connection.send(stanza, now=True)
-        return
 
     def setState(self, newstate):
         if self.state == potr.context.STATE_ENCRYPTED:
@@ -132,8 +151,7 @@ class GajimContext(potr.context.Context):
         self.user.plugin.update_context_list()
 
     def getPolicy(self, key):
-        jid = gajim.get_room_and_nick_from_fjid(self.peer)[0]
-        ret = self.user.plugin.get_flags(self.user.accountname, jid)[key]
+        ret = self.user.plugin.get_flags(self.user.accountname, self.jid)[key]
         log.debug('getPolicy(key=%s) = %s', key, ret)
         return ret
 
@@ -186,7 +204,8 @@ class GajimOtrAccount(potr.context.Account):
                     if acc != self.name or proto != PROTOCOL:
                         continue
 
-                    self.getContext(ctx, newCtxCb).setTrust(fpr, trust)
+                    jid = get_jid_from_fjid(ctx)
+                    self.setTrust(jid, fpr, trust)
         except IOError, e:
             if e.errno != 2:
                 log.exception('IOError occurred when loading fpr file for %s',
@@ -195,10 +214,10 @@ class GajimOtrAccount(potr.context.Account):
     def saveTrusts(self):
         try:
             with open(self.keyFilePath + '.fpr', 'w') as fprFile:
-                for uid, ctx in self.ctxs.iteritems():
-                    for fpr, trust in ctx.trust.iteritems():
+                for uid, trusts in self.trusts.iteritems():
+                    for fpr, trustVal in trusts.iteritems():
                         fprFile.write('\t'.join(
-                                (uid, self.name, PROTOCOL, fpr, trust)))
+                                (uid, self.name, PROTOCOL, fpr, trustVal)))
                         fprFile.write('\n')
         except IOError, e:
             log.exception('IOError occurred when loading fpr file for %s',
@@ -232,6 +251,14 @@ class OtrPlugin(GajimPlugin):
             acc = str(acc)
             if acc not in self.config or None not in self.config[acc]:
                 self.config[acc] = {None:DEFAULTFLAGS.copy()}
+        self.update_context_list()
+
+    @log_calls('OtrPlugin')
+    def activate(self):
+        if not HAS_POTR:
+            raise GajimPluginException('python-otr is missing!')
+        if not hasattr(potr, 'VERSION') or potr.VERSION < MINVERSION:
+            raise GajimPluginException('old / unsupported python-otr version')
 
     def get_otr_status(self, account, contact):
         ctx = self.us[account].getContext(contact.get_full_jid())
@@ -269,7 +296,7 @@ class OtrPlugin(GajimPlugin):
                 ui.get_otr_submenu(self, cc).get_submenu().popup(None,
                         None, None, 0, 0)
             else:
-                cc._on_authentication_button_clicked(cc, widget)
+                cc._on_authentication_button_clicked(widget)
         self.overwrite_handler(cc, cc.authentication_button, authbutton_cb)
 
         # hijack context menu
@@ -358,27 +385,42 @@ class OtrPlugin(GajimPlugin):
     def update_context_list(self):
         self.config_dialog.fpr_model.clear()
         for us in self.us.itervalues():
-            for uid, ctx in us.ctxs.iteritems():
-                for fpr, trust in ctx.trust.iteritems():
-                    trust = False
-                    if ctx.state == potr.context.STATE_ENCRYPTED:
-                        if ctx.getCurrentKey().cfingerprint() == fpr:
-                            state = "encrypted"
-                            tip = enc_tip
-                            trust = bool(ctx.getCurrentTrust())
-                        else:
-                            state = "unused"
-                            tip = unused_tip
-                    elif ctx.state == potr.context.STATE_FINISHED:
-                        state = "finished"
-                        tip = ended_tip
-                    else:
-                        state = 'inactive'
-                        tip = inactive_tip
+            usedFpr = set()
+            for fjid, ctx in us.ctxs.iteritems():
+                # get active contexts first
+                key = ctx.getCurrentKey()
+                if not key:
+                    continue
+                fpr = key.cfingerprint()
+                usedFpr.add(fpr)
+
+                human_hash = potr.human_hash(fpr)
+                trust = bool(us.getTrust(ctx.trustName, fpr))
+
+                if ctx.state == potr.context.STATE_ENCRYPTED:
+                    state = "encrypted"
+                    tip = enc_tip
+                elif ctx.state == potr.context.STATE_FINISHED:
+                    state = "finished"
+                    tip = ended_tip
+                else:
+                    state = 'inactive'
+                    tip = inactive_tip
+
+                self.config_dialog.fpr_model.append((fjid, state, trust,
+                        '<tt>%s</tt>' % human_hash, us.name, tip, fpr))
+
+            for uid, trusts in us.trusts.iteritems():
+                for fpr, trust in trusts.iteritems():
+                    if fpr in usedFpr:
+                        continue
+
+                    state = 'inactive'
+                    tip = inactive_tip
 
                     human_hash = potr.human_hash(fpr)
 
-                    self.config_dialog.fpr_model.append((uid, state, trust,
+                    self.config_dialog.fpr_model.append((uid, state, bool(trust),
                             '<tt>%s</tt>' % human_hash, us.name, tip, fpr))
 
     @classmethod
@@ -458,39 +500,56 @@ class OtrPlugin(GajimPlugin):
             ctx = self.us[account].getContext(event.fjid)
             msgtxt, tlvs = ctx.receiveMessage(event.msgtxt,
                             appdata={'session':event.session})
+        except potr.context.NotOTRMessage, e:
+            # received message was not OTR - pass it on
+            return PASS
         except potr.context.UnencryptedMessage, e:
+            # we are encrypted but got some plaintext
+            # display it with a warning
             tlvs = []
             msgtxt = _('The following message received from %(jid)s was '
                     '*not encrypted*: [%(error)s]') % {'jid': event.fjid,
                     'error': e.args[0]}
         except potr.context.NotEncryptedError, e:
+            # we got some encrypted data
+            # but we don't have an encrypted session
             self.gajim_log(_('The encrypted message received from %s is '
                     'unreadable, as you are not currently communicating '
                     'privately') % event.fjid, account, event.fjid)
             return IGNORE
         except potr.context.ErrorReceived, e:
+            # got a protocol error
             self.gajim_log(_('We received the following OTR error '
                     'message from %(jid)s: [%(error)s]') % {'jid': event.fjid,
                     'error': e.args[0].error})
             return IGNORE
+        except potr.crypt.InvalidParameterError, e:
+            # received a packet we cannot process (probably tampered or
+            # sent to wrong session)
+            self.gajim_log(_('We received an unreadable OTR message '
+                    'from %(jid)s. It has probably been tampered with, '
+                    'or was sent from an older OTR session.')
+                    % {'jid':event.fjid}, account, event.fjid)
+            return IGNORE
         except RuntimeError, e:
+            # generic library bug?
             self.gajim_log(_('The following error occurred when trying to '
                     'decrypt a message from %(jid)s: [%(error)s]') % {
                     'jid': event.fjid, 'error': e},
                     account, event.fjid)
             return IGNORE
-        event.msgtxt = unicode(msgtxt)
-        event.stanza.setBody(event.msgtxt)
-
-        html_node = event.stanza.getTag('html')
-        if html_node:
-            event.stanza.delChild(html_node)
 
         if ctx is not None:
             ctx.smpWindow.handle_tlv(tlvs)
 
-        if not msgtxt:
-            return IGNORE
+        event.msgtxt = unicode(msgtxt or '')
+        event.stanza.setBody(event.msgtxt)
+
+        # every message that went through OTR (ie. was OTR-related) gets
+        # stripped from html. I don't like html.
+        html_node = event.stanza.getTag('html')
+        if html_node:
+            event.stanza.delChild(html_node)
 
         return PASS
 

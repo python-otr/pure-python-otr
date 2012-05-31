@@ -24,6 +24,21 @@
       <column type="gchararray"/>
     </columns>
   </object>
+  <object class="GtkMenu" id="fprclipboard_menu">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="ubuntu_local">True</property>
+    <child>
+      <object class="GtkMenuItem" id="copyfprclipboard_item">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="use_action_appearance">False</property>
+        <property name="label" translatable="yes">Copy to clipboard</property>
+        <property name="use_underline">True</property>
+        <signal name="activate" handler="clipboard_button_cb"/>
+      </object>
+    </child>
+  </object>
   <object class="GtkNotebook" id="notebook1">
     <property name="visible">True</property>
     <property name="can_focus">True</property>
@@ -66,7 +81,6 @@
                             <property name="label" translatable="yes">&lt;tt&gt;-------- -------- -------- -------- --------	&lt;/tt&gt;</property>
                             <property name="use_markup">True</property>
                             <property name="selectable">True</property>
-                            <property name="ellipsize">end</property>
                           </object>
                           <packing>
                             <property name="position">1</property>
@@ -246,6 +260,7 @@
                 <property name="model">fingerprint_store</property>
                 <property name="search_column">0</property>
                 <property name="tooltip_column">5</property>
+                <signal name="button-press-event" handler="fpr_button_pressed_cb" swapped="no"/>
                 <child>
                   <object class="GtkTreeViewColumn" id="name_column">
                     <property name="resizable">True</property>

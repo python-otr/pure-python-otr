@@ -38,6 +38,8 @@ import base64
 import logging
 import struct
 
+logger = logging.getLogger(__name__)
+
 from potr import crypt
 from potr import proto
 
@@ -62,13 +64,12 @@ OFFER_ACCEPTED = 3
 class Context(object):
     __slots__ = ['user', 'policy', 'crypto', 'tagOffer', 'lastSend',
             'lastMessage', 'mayRetransmit', 'fragment', 'fragmentInfo', 'state',
-            'inject', 'trust', 'peer']
+            'inject', 'trust', 'peer', 'trustName']
 
     def __init__(self, account, peername):
         self.user = account
         self.peer = peername
         self.policy = {}
-        self.trust = {}
         self.crypto = crypt.CryptEngine(self)
         self.discardFragment()
         self.tagOffer = OFFER_NOTSENT
@@ -76,6 +77,7 @@ class Context(object):
         self.lastSend = 0
         self.lastMessage = None
         self.state = STATE_PLAINTEXT
+        self.trustName = self.peer
 
     def getPolicy(self, key):
         raise NotImplementedError
@@ -97,7 +99,7 @@ class Context(object):
 
         params = message.split(b',')
         if len(params) < 5 or not params[1].isdigit() or not params[2].isdigit():
-            logging.warning('invalid formed fragmented message: %r', params)
+            logger.warning('invalid formed fragmented message: %r', params)
             return None
 
 
@@ -107,7 +109,7 @@ class Context(object):
         n = int(params[2])
         fragData = params[3]
 
-        logging.debug(params)
+        logger.debug(params)
 
         if n >= k == 1:
             # first fragment
@@ -121,7 +123,7 @@ class Context(object):
         else:
             # bad, discard
             self.discardFragment()
-            logging.warning('invalid fragmented message: %r', params)
+            logger.warning('invalid fragmented message: %r', params)
             return None
 
         if n == k > 0:
@@ -132,8 +134,7 @@ class Context(object):
         return None
 
     def removeFingerprint(self, fingerprint):
-        if fingerprint in self.trust:
-            del self.trust[fingerprint]
+        self.user.removeFingerprint(self.trustName, fingerprint)
 
     def setTrust(self, fingerprint, trustLevel):
         ''' sets the trust level for the given fingerprint.
@@ -141,14 +142,13 @@ class Context(object):
             - the empty string for known but untrusted keys
             - 'verified' for manually verified keys
             - 'smp' for smp-style verified keys '''
-        self.trust[fingerprint] = trustLevel
+        self.user.setTrust(self.trustName, fingerprint, trustLevel)
 
-    def getTrust(self, fingerprint):
-        return self.trust.get(fingerprint, None)
+    def getTrust(self, fingerprint, default=None):
+        return self.user.getTrust(self.trustName, fingerprint, default)
 
     def setCurrentTrust(self, trustLevel):
         self.setTrust(self.crypto.theirPubkey.cfingerprint(), trustLevel)
-        self.user.saveTrusts()
 
     def getCurrentKey(self):
         return self.crypto.theirPubkey
@@ -161,7 +161,7 @@ class Context(object):
             - an empty string if the key is untrusted '''
         if self.crypto.theirPubkey is None:
             return None
-        return self.trust.get(self.crypto.theirPubkey.cfingerprint(), None)
+        return self.getTrust(self.crypto.theirPubkey.cfingerprint(), None)
 
     def receiveMessage(self, messageData, appdata=None):
         IGN = None, []
@@ -175,12 +175,15 @@ class Context(object):
             # nothing to see. move along.
             return IGN
 
-        logging.debug(repr(message))
+        logger.debug(repr(message))
 
         if self.getPolicy('SEND_TAG'):
             if isinstance(message, basestring):
+                # received a plaintext message without tag
+                # we should not tag anymore
                 self.tagOffer = OFFER_REJECTED
             else:
+                # got something OTR-ish, cool!
                 self.tagOffer = OFFER_ACCEPTED
 
         if isinstance(message, proto.Query):
@@ -221,7 +224,7 @@ class Context(object):
             except crypt.InvalidParameterError:
                 if ignore:
                     return IGN
-                logging.exception('decryption failed')
+                logger.exception('decryption failed')
                 raise
         if isinstance(message, basestring):
             if self.state != STATE_PLAINTEXT or \
@@ -231,25 +234,37 @@ class Context(object):
         if isinstance(message, proto.Error):
             raise ErrorReceived(message)
 
-        return message, []
+        raise NotOTRMessage(message)
 
     def sendInternal(self, msg, tlvs=[], appdata=None):
-        if isinstance(msg, basestring):
-            self.sendMessage(FRAGMENT_SEND_ALL, msg,
-                    flags=proto.MSGFLAGS_IGNORE_UNREADABLE, tlvs=tlvs,
-                    appdata=appdata)
-        else:
-            self.sendFragmented(FRAGMENT_SEND_ALL, bytes(msg), appdata=appdata)
+        self.sendMessage(FRAGMENT_SEND_ALL, msg, tlvs=tlvs, appdata=appdata,
+                flags=proto.MSGFLAGS_IGNORE_UNREADABLE)
 
     def sendMessage(self, sendPolicy, msg, flags=0, tlvs=[], appdata=None):
         if self.policyOtrEnabled():
             self.lastSend = time()
-            msg = bytes(self.processOutgoingMessage(msg, flags, tlvs))
-        return self.sendFragmented(sendPolicy, msg, appdata=appdata)
+
+            if isinstance(msg, proto.OTRMessage):
+                # we want to send a protocol message (probably internal)
+                # so we don't need further protocol encryption
+                # also we can't add TLVs to arbitrary protocol messages
+                if tlvs:
+                    raise TypeError('can\'t add tlvs to protocol message')
+            else:
+                # we got plaintext to send. encrypt it
+                msg = self.processOutgoingMessage(msg, flags, tlvs)
+
+            if isinstance(msg, proto.OTRMessage) \
+                    and not isinstance(msg, proto.Query):
+                # if it's a query message, it must not get fragmented
+                return self.sendFragmented(bytes(msg), policy=sendPolicy, appdata=appdata)
+            else:
+                msg = bytes(msg)
+        return msg
 
     def processOutgoingMessage(self, msg, flags, tlvs=[]):
         if isinstance(self.parse(msg), proto.Query):
-            msg = self.user.getDefaultQueryMessage(self.getPolicy)
+            return self.user.getDefaultQueryMessage(self.getPolicy)
 
         if self.state == STATE_PLAINTEXT:
             if self.getPolicy('REQUIRE_ENCRYPTION'):
@@ -286,11 +301,10 @@ class Context(object):
     def _wentEncrypted(self):
         self.setState(STATE_ENCRYPTED)
 
-    def sendFragmented(self, sendPolicy, msg, appdata=None):
-        mms = self.user.maxMessageSize
+    def sendFragmented(self, msg, policy=FRAGMENT_SEND_ALL, appdata=None):
+        mms = self.maxMessageSize(appdata)
         msgLen = len(msg)
-        if mms != 0 and len(msg) > mms and self.policyOtrEnabled() \
-                and self.state == STATE_ENCRYPTED:
+        if mms != 0 and len(msg) > mms:
             fms = mms - 19
             fragments = [ msg[i:i+fms] for i in range(0, len(msg), fms) ]
 
@@ -304,21 +318,21 @@ class Context(object):
                 fragments[fi] = b'?OTR,' + ctr.encode('ascii') \
                         + fragments[fi] + b','
 
-            if sendPolicy == FRAGMENT_SEND_ALL:
+            if policy == FRAGMENT_SEND_ALL:
                 for f in fragments:
                     self.inject(f, appdata=appdata)
                 return None
-            elif sendPolicy == FRAGMENT_SEND_ALL_BUT_FIRST:
+            elif policy == FRAGMENT_SEND_ALL_BUT_FIRST:
                 for f in fragments[1:]:
                     self.inject(f, appdata=appdata)
                 return fragments[0]
-            elif sendPolicy == FRAGMENT_SEND_ALL_BUT_LAST:
+            elif policy == FRAGMENT_SEND_ALL_BUT_LAST:
                 for f in fragments[:-1]:
                     self.inject(f, appdata=appdata)
                 return fragments[-1]
 
         else:
-            if sendPolicy == FRAGMENT_SEND_ALL:
+            if policy == FRAGMENT_SEND_ALL:
                 self.inject(msg, appdata=appdata)
                 return None
             else:
@@ -327,7 +341,7 @@ class Context(object):
     def processTLVs(self, tlvs, appdata=None):
         for tlv in tlvs:
             if isinstance(tlv, proto.DisconnectTLV):
-                logging.info('got disconnect tlv, forcing finished state')
+                logger.info('got disconnect tlv, forcing finished state')
                 self.setState(STATE_FINISHED)
                 self.crypto.finished()
                 # TODO cleanup
@@ -335,7 +349,7 @@ class Context(object):
             if isinstance(tlv, proto.SMPTLV):
                 self.crypto.smpHandle(tlv, appdata=appdata)
                 continue
-            logging.info('got unhandled tlv: {0!r}'.format(tlv))
+            logger.info('got unhandled tlv: {0!r}'.format(tlv))
 
     def smpAbort(self, appdata=None):
         if self.state != STATE_ENCRYPTED:
@@ -410,7 +424,7 @@ class Context(object):
             cls = proto.messageClasses.get(classInfo, None)
             if cls is None:
                 return message
-            logging.debug('{user} got msg {typ!r}' \
+            logger.debug('{user} got msg {typ!r}' \
                     .format(user=self.user.name, typ=cls))
             return cls.parsePayload(message[indexBase+5:])
 
@@ -418,6 +432,10 @@ class Context(object):
             return proto.Error(message[indexBase+7:])
 
         return message
+
+    def maxMessageSize(self, appdata=None):
+        """Return the max message size for this context."""
+        return self.user.maxMessageSize
 
 class Account(object):
     contextclass = Context
@@ -427,6 +445,7 @@ class Account(object):
         self.policy = {}
         self.protocol = protocol
         self.ctxs = {}
+        self.trusts = {}
         self.maxMessageSize = maxMessageSize
         self.defaultQuery = b'?OTRv{versions}?\n{accountname} has requested ' \
                 b'an Off-the-Record private conversation.  However, you ' \
@@ -468,9 +487,26 @@ class Account(object):
         v  = b'2' if policy('ALLOW_V2') else b''
         return self.defaultQuery.format(accountname=self.name, versions=v)
 
+    def setTrust(self, key, fingerprint, trustLevel):
+        if key not in self.trusts:
+            self.trusts[key] = {}
+        self.trusts[key][fingerprint] = trustLevel
+        self.saveTrusts()
+
+    def getTrust(self, key, fingerprint, default=None):
+        if key not in self.trusts:
+            return default
+        return self.trusts[key].get(fingerprint, default)
+
+    def removeFingerprint(self, key, fingerprint):
+        if key in self.trusts and fingerprint in self.trusts[key]:
+            del self.trusts[key][fingerprint]
+
 class NotEncryptedError(RuntimeError):
     pass
 class UnencryptedMessage(RuntimeError):
     pass
 class ErrorReceived(RuntimeError):
+    pass
+class NotOTRMessage(RuntimeError):
     pass
