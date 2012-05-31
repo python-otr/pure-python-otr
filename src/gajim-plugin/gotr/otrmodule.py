@@ -521,7 +521,8 @@ class OtrPlugin(GajimPlugin):
             # got a protocol error
             self.gajim_log(_('We received the following OTR error '
                     'message from %(jid)s: [%(error)s]') % {'jid': event.fjid,
-                    'error': e.args[0].error})
+                    'error': e.args[0].error},
+                    account, event.fjid)
             return IGNORE
         except potr.crypt.InvalidParameterError, e:
             # received a packet we cannot process (probably tampered or
