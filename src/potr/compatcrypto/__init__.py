@@ -18,7 +18,4 @@
 
 from potr.compatcrypto.common import *
 
-try:
-    from potr.compatcrypto.pycrypto import *
-except ImportError:
-    from potr.compatcrypto.pure import *
+from potr.compatcrypto.pycrypto import *
