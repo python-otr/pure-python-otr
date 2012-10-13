@@ -30,6 +30,7 @@ Off-The-Record encryption plugin.
 '''
 
 MINVERSION = (1,0,0,'beta5')
+MINCRYPTOVERSION = (2,1,0,'final',0)
 IGNORE = True
 PASS = False
 
@@ -54,7 +55,9 @@ inactive_tip = 'Communication to this contact is currently ' \
         '<i>unencrypted</i>'
 
 import os
+import pickle
 import time
+import sys
 import logging
 
 import common.xmpp
@@ -68,10 +71,22 @@ from plugins.plugin import GajimPluginException
 
 import ui
 
+sys.path.insert(0, os.path.dirname(ui.__file__))
+
+HAS_CRYPTO = True
+try:
+    import Crypto
+    if not hasattr(Crypto, 'version_info') \
+    or Crypto.version_info < MINCRYPTOVERSION:
+        raise ImportError('PyCrypto not found or too old')
+except ImportError:
+    HAS_CRYPTO = False
 
 HAS_POTR = True
 try:
     import potr
+    import potr.crypt
+    import potr.context
     if not hasattr(potr, 'VERSION') or potr.VERSION < MINVERSION:
         raise ImportError('old / unsupported python-otr version')
 
@@ -81,148 +96,147 @@ try:
     gajimrootlog = logging.getLogger('gajim')
     for h in gajimrootlog.handlers:
         potrrootlog.addHandler(h)
-except ImportError:
-    HAS_POTR = False
 
-def get_jid_from_fjid(fjid):
-    return gajim.get_room_and_nick_from_fjid(fjid)[0]
+    def get_jid_from_fjid(fjid):
+        return gajim.get_room_and_nick_from_fjid(fjid)[0]
 
-class GajimContext(potr.context.Context):
-    # self.peer is fjid
-    # self.jid does not contain resource
-    __slots__ = ['smpWindow', 'jid']
+    class GajimContext(potr.context.Context):
+        # self.peer is fjid
+        # self.jid does not contain resource
+        __slots__ = ['smpWindow', 'jid']
 
-    def __init__(self, account, peer):
-        super(GajimContext, self).__init__(account, peer)
-        self.jid = get_jid_from_fjid(peer)
-        self.trustName = self.jid
-        self.smpWindow = ui.ContactOtrSmpWindow(self)
+        def __init__(self, account, peer):
+            super(GajimContext, self).__init__(account, peer)
+            self.jid = get_jid_from_fjid(peer)
+            self.trustName = self.jid
+            self.smpWindow = ui.ContactOtrSmpWindow(self)
 
-    def inject(self, msg, appdata=None):
-        log.debug('inject(appdata=%s)', appdata)
-        msg = unicode(msg)
-        account = self.user.accountname
+        def inject(self, msg, appdata=None):
+            log.debug('inject(appdata=%s)', appdata)
+            msg = unicode(msg)
+            account = self.user.accountname
 
-        stanza = common.xmpp.Message(to=self.peer, body=msg, typ='chat')
-        if appdata is not None:
-            session = appdata.get('session', None)
-            if session is not None:
-                stanza.setThread(session.thread_id)
-        gajim.connections[account].connection.send(stanza, now=True)
+            stanza = common.xmpp.Message(to=self.peer, body=msg, typ='chat')
+            if appdata is not None:
+                session = appdata.get('session', None)
+                if session is not None:
+                    stanza.setThread(session.thread_id)
+            gajim.connections[account].connection.send(stanza, now=True)
 
-    def setState(self, newstate):
-        if self.state == potr.context.STATE_ENCRYPTED:
-            # we were encrypted
-            if newstate == potr.context.STATE_ENCRYPTED:
-                # and are still -> it's just a refresh
-                OtrPlugin.gajim_log(
-                        _('Private conversation with %s refreshed.') % self.peer,
-                        self.user.accountname, self.peer)
-            elif newstate == potr.context.STATE_FINISHED:
-                # and aren't anymore -> other side disconnected
-                OtrPlugin.gajim_log(_('%s has ended his/her private '
-                        'conversation with you. You should do the same.')
-                        % self.peer, self.user.accountname, self.peer)
-        else:
-            if newstate == potr.context.STATE_ENCRYPTED:
-                # we are now encrypted
-                trust = self.getCurrentTrust()
-                if trust is None:
-                    fpr = str(self.getCurrentKey())
-                    OtrPlugin.gajim_log(_('New fingerprint for %(peer)s: %(fpr)s')
-                            % {'peer': self.peer, 'fpr': fpr},
+        def setState(self, newstate):
+            if self.state == potr.context.STATE_ENCRYPTED:
+                # we were encrypted
+                if newstate == potr.context.STATE_ENCRYPTED:
+                    # and are still -> it's just a refresh
+                    OtrPlugin.gajim_log(
+                            _('Private conversation with %s refreshed.') % self.peer,
                             self.user.accountname, self.peer)
-                    self.setCurrentTrust('')
-                trustStr = 'authenticated' if bool(trust) else '*unauthenticated*'
+                elif newstate == potr.context.STATE_FINISHED:
+                    # and aren't anymore -> other side disconnected
+                    OtrPlugin.gajim_log(_('%s has ended his/her private '
+                            'conversation with you. You should do the same.')
+                            % self.peer, self.user.accountname, self.peer)
+            else:
+                if newstate == potr.context.STATE_ENCRYPTED:
+                    # we are now encrypted
+                    trust = self.getCurrentTrust()
+                    if trust is None:
+                        fpr = str(self.getCurrentKey())
+                        OtrPlugin.gajim_log(_('New fingerprint for %(peer)s: %(fpr)s')
+                                % {'peer': self.peer, 'fpr': fpr},
+                                self.user.accountname, self.peer)
+                        self.setCurrentTrust('')
+                    trustStr = 'authenticated' if bool(trust) else '*unauthenticated*'
+                    OtrPlugin.gajim_log(
+                        _('%(trustStr)s secured OTR conversation with %(peer)s started')
+                        % {'trustStr': trustStr, 'peer': self.peer},
+                        self.user.accountname, self.peer)
+
+            if self.state != potr.context.STATE_PLAINTEXT and \
+                    newstate == potr.context.STATE_PLAINTEXT:
+                # we are now plaintext
                 OtrPlugin.gajim_log(
-                    _('%(trustStr)s secured OTR conversation with %(peer)s started')
-                    % {'trustStr': trustStr, 'peer': self.peer},
-                    self.user.accountname, self.peer)
+                        _('Private conversation with %s lost.') % self.peer,
+                        self.user.accountname, self.peer)
 
-        if self.state != potr.context.STATE_PLAINTEXT and \
-                newstate == potr.context.STATE_PLAINTEXT:
-            # we are now plaintext
-            OtrPlugin.gajim_log(
-                    _('Private conversation with %s lost.') % self.peer,
-                    self.user.accountname, self.peer)
+            super(GajimContext, self).setState(newstate)
+            OtrPlugin.update_otr(self.peer, self.user.accountname)
+            self.user.plugin.update_context_list()
 
-        super(GajimContext, self).setState(newstate)
-        OtrPlugin.update_otr(self.peer, self.user.accountname)
-        self.user.plugin.update_context_list()
+        def getPolicy(self, key):
+            ret = self.user.plugin.get_flags(self.user.accountname, self.jid)[key]
+            log.debug('getPolicy(key=%s) = %s', key, ret)
+            return ret
 
-    def getPolicy(self, key):
-        ret = self.user.plugin.get_flags(self.user.accountname, self.jid)[key]
-        log.debug('getPolicy(key=%s) = %s', key, ret)
-        return ret
+    class GajimOtrAccount(potr.context.Account):
+        contextclass = GajimContext
+        def __init__(self, plugin, accountname):
+            global PROTOCOL, MMS
+            self.plugin = plugin
+            self.accountname = accountname
+            name = gajim.get_jid_from_account(accountname)
+            super(GajimOtrAccount, self).__init__(name, PROTOCOL, MMS)
+            self.keyFilePath = os.path.join(gajim.gajimpaths.data_root, accountname)
 
-class GajimOtrAccount(potr.context.Account):
-    contextclass = GajimContext
-    def __init__(self, plugin, accountname):
-        global PROTOCOL, MMS
-        self.plugin = plugin
-        self.accountname = accountname
-        name = gajim.get_jid_from_account(accountname)
-        super(GajimOtrAccount, self).__init__(name, PROTOCOL, MMS)
-        self.keyFilePath = os.path.join(gajim.gajimpaths.data_root, accountname)
+        def dropPrivkey(self):
+            try:
+                os.remove(self.keyFilePath + '.key3')
+            except IOError, e:
+                if e.errno != 2:
+                    log.exception('IOError occurred when removing key file for %s',
+                            self.name)
+            self.privkey = None
 
-    def dropPrivkey(self):
-        try:
-            os.remove(self.keyFilePath + '.key3')
-        except IOError, e:
-            if e.errno != 2:
-                log.exception('IOError occurred when removing key file for %s',
-                        self.name)
-        self.privkey = None
+        def loadPrivkey(self):
+            try:
+                with open(self.keyFilePath + '.key3', 'rb') as keyFile:
+                    return potr.crypt.PK.parsePrivateKey(keyFile.read())[0]
+            except IOError, e:
+                if e.errno != 2:
+                    log.exception('IOError occurred when loading key file for %s',
+                            self.name)
+            return None
 
-    def loadPrivkey(self):
-        try:
-            with open(self.keyFilePath + '.key3', 'rb') as keyFile:
-                return potr.crypt.PK.parsePrivateKey(keyFile.read())[0]
-        except IOError, e:
-            if e.errno != 2:
+        def savePrivkey(self):
+            try:
+                with open(self.keyFilePath + '.key3', 'wb') as keyFile:
+                    keyFile.write(self.getPrivkey().serializePrivateKey())
+            except IOError, e:
                 log.exception('IOError occurred when loading key file for %s',
                         self.name)
-        return None
 
-    def savePrivkey(self):
-        try:
-            with open(self.keyFilePath + '.key3', 'wb') as keyFile:
-                keyFile.write(self.getPrivkey().serializePrivateKey())
-        except IOError, e:
-            log.exception('IOError occurred when loading key file for %s',
-                    self.name)
+        def loadTrusts(self, newCtxCb=None):
+            ''' load the fingerprint trustdb '''
+            # it has the same format as libotr, therefore the
+            # redundant account / proto field
+            try:
+                with open(self.keyFilePath + '.fpr', 'r') as fprFile:
+                    for line in fprFile:
+                        ctx, acc, proto, fpr, trust = line[:-1].split('\t')
 
-    def loadTrusts(self, newCtxCb=None):
-        ''' load the fingerprint trustdb '''
-        # it has the same format as libotr, therefore the
-        # redundant account / proto field
-        try:
-            with open(self.keyFilePath + '.fpr', 'r') as fprFile:
-                for line in fprFile:
-                    ctx, acc, proto, fpr, trust = line[:-1].split('\t')
+                        if acc != self.name or proto != PROTOCOL:
+                            continue
 
-                    if acc != self.name or proto != PROTOCOL:
-                        continue
+                        jid = get_jid_from_fjid(ctx)
+                        self.setTrust(jid, fpr, trust)
+            except IOError, e:
+                if e.errno != 2:
+                    log.exception('IOError occurred when loading fpr file for %s',
+                            self.name)
 
-                    jid = get_jid_from_fjid(ctx)
-                    self.setTrust(jid, fpr, trust)
-        except IOError, e:
-            if e.errno != 2:
+        def saveTrusts(self):
+            try:
+                with open(self.keyFilePath + '.fpr', 'w') as fprFile:
+                    for uid, trusts in self.trusts.iteritems():
+                        for fpr, trustVal in trusts.iteritems():
+                            fprFile.write('\t'.join(
+                                    (uid, self.name, PROTOCOL, fpr, trustVal)))
+                            fprFile.write('\n')
+            except IOError, e:
                 log.exception('IOError occurred when loading fpr file for %s',
                         self.name)
-
-    def saveTrusts(self):
-        try:
-            with open(self.keyFilePath + '.fpr', 'w') as fprFile:
-                for uid, trusts in self.trusts.iteritems():
-                    for fpr, trustVal in trusts.iteritems():
-                        fprFile.write('\t'.join(
-                                (uid, self.name, PROTOCOL, fpr, trustVal)))
-                        fprFile.write('\n')
-        except IOError, e:
-            log.exception('IOError occurred when loading fpr file for %s',
-                    self.name)
-
+except ImportError:
+    HAS_POTR = False
 
 def otr_dialog_destroy(widget, *args, **kwargs):
     widget.destroy()
@@ -233,6 +247,20 @@ class OtrPlugin(GajimPlugin):
 
         self.description = _('See http://www.cypherpunks.ca/otr/')
         self.us = {}
+
+
+        if not HAS_POTR:
+            self.activatable = False
+            self.available_text = _('Can\'t find potr. Verify this ' \
+                    'plugin\'s integrity.')
+            return
+
+        if not HAS_CRYPTO:
+            self.activatable = False
+            self.available_text = _('PyCrypto not installed or too old.')
+            return
+
+
         self.config_dialog = ui.OtrPluginConfigDialog(self)
         self.events_handlers = {}
         self.events_handlers['message-received'] = (ged.PRECORE,
@@ -255,10 +283,9 @@ class OtrPlugin(GajimPlugin):
 
     @log_calls('OtrPlugin')
     def activate(self):
-        if not HAS_POTR:
-            raise GajimPluginException('python-otr is missing!')
-        if not hasattr(potr, 'VERSION') or potr.VERSION < MINVERSION:
-            raise GajimPluginException('old / unsupported python-otr version')
+        if not HAS_CRYPTO or not HAS_POTR or not hasattr(potr, 'VERSION') \
+        or potr.VERSION < MINVERSION:
+            raise GajimPluginException(self.available_text)
 
     def get_otr_status(self, account, contact):
         ctx = self.us[account].getContext(contact.get_full_jid())

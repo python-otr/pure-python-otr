@@ -24,7 +24,11 @@ from common import gajim
 from plugins.gui import GajimPluginConfigDialog
 
 import otrmodule
-import potr
+try:
+    import potr
+    import potr.proto
+except ImportError:
+    pass
 
 
 class OtrPluginConfigDialog(GajimPluginConfigDialog):
