@@ -54,11 +54,11 @@ ended_tip = 'The private chat session to this contact has <i>ended</i>'
 inactive_tip = 'Communication to this contact is currently ' \
         '<i>unencrypted</i>'
 
+import logging
 import os
 import pickle
 import time
 import sys
-import logging
 
 import common.xmpp
 from common import gajim
@@ -72,6 +72,9 @@ from plugins.plugin import GajimPluginException
 import ui
 
 sys.path.insert(0, os.path.dirname(ui.__file__))
+
+from HTMLParser import HTMLParser
+from htmlentitydefs import name2codepoint
 
 HAS_CRYPTO = True
 try:
@@ -570,14 +573,11 @@ class OtrPlugin(GajimPlugin):
         if ctx is not None:
             ctx.smpWindow.handle_tlv(tlvs)
 
-        event.msgtxt = unicode(msgtxt or '')
+        stripper = HTMLStripper()
+        stripper.feed(unicode(msgtxt or ''))
+        event.msgtxt = stripper.stripped_data
         event.stanza.setBody(event.msgtxt)
-
-        # every message that went through OTR (ie. was OTR-related) gets
-        # stripped from html. I don't like html.
-        html_node = event.stanza.getTag('html')
-        if html_node:
-            event.stanza.delChild(html_node)
+        event.stanza.setXHTML(msgtxt)
 
         return PASS
 
@@ -596,9 +596,11 @@ class OtrPlugin(GajimPlugin):
             if event.resource:
                 fjid += '/' + event.resource
 
+        message = event.xhtml or escape(event.message)
+
         try:
             newmsg = self.us[event.account].getContext(fjid).sendMessage(
-                    potr.context.FRAGMENT_SEND_ALL_BUT_LAST, event.message,
+                    potr.context.FRAGMENT_SEND_ALL_BUT_LAST, message,
                     appdata={'session':event.session})
         except potr.context.NotEncryptedError, e:
             if e.args[0] == potr.context.EXC_FINISHED:
@@ -608,9 +610,45 @@ class OtrPlugin(GajimPlugin):
                 return IGNORE
             else:
                 raise e
-        event.message = newmsg
+
+        if event.xhtml: # if we had html before, replace with new content
+            event.xhtml = newmsg
+
+        stripper = HTMLStripper()
+        stripper.feed(unicode(newmsg or ''))
+        event.message = stripper.stripped_data
 
         return PASS
+
+
+class HTMLStripper(HTMLParser):
+    def reset(self):
+        self.stripped_data = ''
+        HTMLParser.reset(self)
+
+    def handle_data(self, data):
+        self.stripped_data += data
+    def handle_entityref(self, name):
+        c = unichr(name2codepoint[name])
+        self.stripped_data += c
+    def handle_charref(self, name):
+        if name.startswith('x'):
+            c = unichr(int(name[1:], 16))
+        else:
+            c = unichr(int(name))
+        self.stripped_data += c
+    def unknown_decl(self, data):
+        if data.startswith('CDATA['):
+            self.data += data[6:]
+
+def escape(s):
+    '''Replace special characters "&", "<" and ">" to HTML-safe sequences.
+    If the optional flag quote is true, the quotation mark character (")
+    is also translated.'''
+    s = s.replace("&", "&amp;") # Must be done first!
+    s = s.replace("<", "&lt;")
+    s = s.replace(">", "&gt;")
+    return s
 
 ## TODO:
 ##  - disconnect ctxs on disconnect
