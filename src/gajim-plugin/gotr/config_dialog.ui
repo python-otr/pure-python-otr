@@ -33,7 +33,7 @@
         <property name="visible">True</property>
         <property name="can_focus">False</property>
         <property name="use_action_appearance">False</property>
-        <property name="label" translatable="yes">Copy to clipboard</property>
+        <property name="label" translatable="yes" comments="Context menu item">Copy to clipboard</property>
         <property name="use_underline">True</property>
         <signal name="activate" handler="clipboard_button_cb"/>
       </object>
@@ -68,7 +68,7 @@
                         <child>
                           <object class="GtkLabel" id="fingerprint_label_desc">
                             <property name="visible">True</property>
-                            <property name="label" translatable="yes">Fingerprint:</property>
+                            <property name="label" translatable="yes" comments="Descriptive label">Fingerprint:</property>
                           </object>
                           <packing>
                             <property name="expand">False</property>
@@ -78,7 +78,7 @@
                         <child>
                           <object class="GtkLabel" id="fingerprint_label">
                             <property name="visible">True</property>
-                            <property name="label" translatable="yes">&lt;tt&gt;-------- -------- -------- -------- --------	&lt;/tt&gt;</property>
+                            <property name="label">&lt;tt&gt;-------- -------- -------- -------- --------	&lt;/tt&gt;</property>
                             <property name="use_markup">True</property>
                             <property name="selectable">True</property>
                           </object>
@@ -94,7 +94,7 @@
                     </child>
                     <child>
                       <object class="GtkButton" id="regenerate_button">
-                        <property name="label" translatable="yes">(Re-)generate</property>
+                        <property name="label" translatable="yes" comments="Generate Fingerprint button">(Re-)generate</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="receives_default">True</property>
@@ -121,7 +121,7 @@
                                 <property name="orientation">vertical</property>
                                 <child>
                                   <object class="GtkCheckButton" id="enable_check">
-                                    <property name="label" translatable="yes">Enable private (Off-the-Record) messaging</property>
+                                    <property name="label" translatable="yes" comments="checkbox">Enable private (Off-the-Record) messaging</property>
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
@@ -134,7 +134,7 @@
                                 </child>
                                 <child>
                                   <object class="GtkCheckButton" id="advertise_check">
-                                    <property name="label" translatable="yes">Advertise Off-the-Record messaging support</property>
+                                    <property name="label" translatable="yes" comments="checkbox">Advertise Off-the-Record messaging support</property>
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
@@ -147,7 +147,7 @@
                                 </child>
                                 <child>
                                   <object class="GtkCheckButton" id="autoinitiate_check">
-                                    <property name="label" translatable="yes">Automatically start private messaging</property>
+                                    <property name="label" translatable="yes" comments="checkbox">Automatically start private messaging</property>
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
@@ -160,7 +160,7 @@
                                 </child>
                                 <child>
                                   <object class="GtkCheckButton" id="require_check">
-                                    <property name="label" translatable="yes">Require private messaging</property>
+                                    <property name="label" translatable="yes" comments="checkbox">Require private messaging</property>
                                     <property name="visible">True</property>
                                     <property name="can_focus">True</property>
                                     <property name="receives_default">False</property>
@@ -178,7 +178,7 @@
                         <child type="label">
                           <object class="GtkLabel" id="label3">
                             <property name="visible">True</property>
-                            <property name="label" translatable="yes">&lt;b&gt;Default OTR Settings&lt;/b&gt;</property>
+                            <property name="label" translatable="yes" comments="title above options">&lt;b&gt;Default OTR Settings&lt;/b&gt;</property>
                             <property name="use_markup">True</property>
                           </object>
                         </child>
@@ -199,7 +199,7 @@
                 <child>
                   <object class="GtkLabel" id="label4">
                     <property name="visible">True</property>
-                    <property name="label" translatable="yes">&lt;b&gt;Off-the-Record settings for:&lt;/b&gt;</property>
+                    <property name="label" translatable="yes" comments="label for account selector">&lt;b&gt;Off-the-Record settings for:&lt;/b&gt;</property>
                     <property name="use_markup">True</property>
                   </object>
                   <packing>
@@ -236,7 +236,7 @@
     <child type="tab">
       <object class="GtkLabel" id="label1">
         <property name="visible">True</property>
-        <property name="label" translatable="yes">OTR Settings</property>
+        <property name="label" translatable="yes" comments="tab label">OTR Settings</property>
       </object>
       <packing>
         <property name="tab_fill">False</property>
@@ -335,7 +335,7 @@
             <property name="homogeneous">True</property>
             <child>
               <object class="GtkButton" id="verify_button">
-                <property name="label" translatable="yes">Verify Fingerprint</property>
+                <property name="label" translatable="yes" comments="button">Verify Fingerprint</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -347,7 +347,7 @@
             </child>
             <child>
               <object class="GtkButton" id="forget_button">
-                <property name="label" translatable="yes">Forget Fingerprint</property>
+                <property name="label" translatable="yes" comments="button">Forget Fingerprint</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -371,7 +371,7 @@
     <child type="tab">
       <object class="GtkLabel" id="label2">
         <property name="visible">True</property>
-        <property name="label" translatable="yes">Known Fingerprints</property>
+        <property name="label" translatable="yes" comments="tab label">Known Fingerprints</property>
       </object>
       <packing>
         <property name="position">1</property>
