@@ -103,21 +103,51 @@ class checked_install_lib(install_lib):
 
 
 setup(
-    name='python-potr',
-    version='1.0.0b5',
-    description='pure Python Off-The-Record encryption',
-    author='Kjell Braden',
-    author_email='afflux@pentabarf.de',
-    url='http://python-otr.pentabarf.de',
     packages=['potr', 'potr.compatcrypto', 'gotr'],
     package_dir={'potr':'src/potr', 'gotr':'src/gajim-plugin/gotr'},
     package_data={'gotr':['*.ini', '*.ui']},
 
+
+    name='python-potr',
+    version='1.0.0b5',
+    description='pure Python Off-The-Record encryption',
+    long_description='''This is a pure Python OTR implementation; it does not bind to libotr.
+
+Included in this package is a Gajim Python plugin to enable OTR support
+in the Gajim XMPP/Jabber client. This plugin is called gotr.
+
+
+**Installing this module will install (but not activate) the gajim-otr plugin if a
+gajim directory can be found in $PREFIX/share/gajim.**
+
+The gajim search path can be changed manually by specifiying ``--gajim-dir`` to
+the install commmand::
+
+    sudo python setup.py install --gajim-dir=~/gajim
+
+After installing, the plugin must be manually enabled in the Gajim plugin
+interface.
+
+Reporting bugs
+==============
+Please read the `FAQ <https://github.com/afflux/pure-python-otr/wiki>`_ before submitting your
+issue to the `tracker <https:///afflux/pure-python-otr/issues>`_.''',
+
+    platforms='any',
+    license='LGPLv3+',
+
+    author='Kjell Braden',
+    author_email='afflux@pentabarf.de',
+
+    url='http://python-otr.pentabarf.de',
+    download_url='https://github.com/afflux/pure-python-otr/downloads',
+
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
-        'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
+        'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)',
         'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 3',
         'Topic :: Communications :: Chat',
         'Topic :: Security :: Cryptography',
         ],
