@@ -648,6 +648,7 @@ def escape(s):
     s = s.replace("&", "&amp;") # Must be done first!
     s = s.replace("<", "&lt;")
     s = s.replace(">", "&gt;")
+    s = re.sub(r'(.*)<br ?\?>(.*)', r'\1\n\1', s)
     return s
 
 ## TODO:
