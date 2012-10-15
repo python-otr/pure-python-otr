@@ -628,6 +628,11 @@ class HTMLStripper(HTMLParser):
 
     def handle_data(self, data):
         self.stripped_data += data
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'br':
+            self.stripped_data += '\n'
+
     def handle_entityref(self, name):
         c = unichr(name2codepoint[name])
         self.stripped_data += c
@@ -637,9 +642,14 @@ class HTMLStripper(HTMLParser):
         else:
             c = unichr(int(name))
         self.stripped_data += c
+
     def unknown_decl(self, data):
         if data.startswith('CDATA['):
-            self.data += data[6:]
+            self.stripped_data += data[6:]
+
+    def feed(self, data):
+        data = data.replace('\n', '')
+        HTMLParser.feed(self, data)
 
 def escape(s):
     '''Replace special characters "&", "<" and ">" to HTML-safe sequences.
@@ -648,6 +658,7 @@ def escape(s):
     s = s.replace("&", "&amp;") # Must be done first!
     s = s.replace("<", "&lt;")
     s = s.replace(">", "&gt;")
+    s = s.replace("\n", "<br/>")
     return s
 
 ## TODO:
