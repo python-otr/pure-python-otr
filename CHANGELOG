@@ -1,3 +1,13 @@
+1.0.0beta6 (2012-10-17)
+ - potr: max message size can be set per context/message
+ - gotr: handle html messages
+ - gotr: install plugin from setup.py if a gajim directory was found
+ - gotr: provide option to copy fingerprints to clipboard
+ - gotr: use gajim logging system
+ - fix: don't send context refreshing request in an encrypted packet
+ - fix: AKEs were not being fragmented
+ - minor bugfixes
+
 1.0.0beta5 (2012-03-29)
  - gotr: bugfix: plugin broke gajim's ressource discovery (issue #7)
  - gotr: store the fingerprints per user, not per ressource (issue #6)
