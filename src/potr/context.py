@@ -277,8 +277,12 @@ class Context(object):
                 return msg
             if self.getPolicy('SEND_TAG') and self.tagOffer != OFFER_REJECTED:
                 self.tagOffer = OFFER_SENT
-                return proto.TaggedPlaintext(msg, self.getPolicy('ALLOW_V1'),
-                        self.getPolicy('ALLOW_V2'))
+                versions = set()
+                if self.getPolicy('ALLOW_V1'):
+                    versions.add(1)
+                if self.getPolicy('ALLOW_V2'):
+                    versions.add(2)
+                return proto.TaggedPlaintext(msg, versions)
             return msg
         if self.state == STATE_ENCRYPTED:
             msg = self.crypto.createDataMessage(msg, flags, tlvs)
@@ -375,9 +379,9 @@ class Context(object):
         self.crypto.smpSecret(secret, question=question, appdata=appdata)
 
     def handleQuery(self, message, appdata=None):
-        if message.v2 and self.getPolicy('ALLOW_V2'):
+        if 2 in message.versions and self.getPolicy('ALLOW_V2'):
             self.authStartV2(appdata=appdata)
-        elif message.v1 and self.getPolicy('ALLOW_V1'):
+        elif 1 in message.versions and self.getPolicy('ALLOW_V1'):
             self.authStartV1(appdata=appdata)
 
     def authStartV1(self, appdata=None):

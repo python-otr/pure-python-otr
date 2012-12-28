@@ -31,7 +31,7 @@ class ProtoTest(unittest.TestCase):
         self.assertEqual((65280, b''), proto.read_mpi(b'\0\0\0\2\xff\0'))
         # large values
         self.assertEqual((0x100**0x100-1, b'\xff'),
-                proto.read_mpi(b'\0\0\1\0'+257*b'\xff')) 
+                proto.read_mpi(b'\0\0\1\0'+257*b'\xff'))
 
     def testUnpackData(self):
         encMsg = b'\0\0\0\1q\0\0\0\x0afoobarbazx'
@@ -41,39 +41,49 @@ class ProtoTest(unittest.TestCase):
         self.assertEqual(b'foobarbazx', decMsg)
         self.assertEqual(b'', encMsg)
 
-    def testQuery(self):
-        self.assertEqual(b'?OTRv?', bytes(proto.Query(False, False)))
-        self.assertEqual(b'?OTRv2?', bytes(proto.Query(False, True)))
-        self.assertEqual(b'?OTR?v?', bytes(proto.Query(True, False)))
-        self.assertEqual(b'?OTR?v2?', bytes(proto.Query(True, True)))
+    def queryBoth(self, suffix, vset):
+        self.assertEqual(b'?OTR' + suffix, bytes(proto.Query(vset)))
+        self.assertEqual(proto.Query(vset), proto.Query.parse(suffix))
 
-        self.assertEqual(proto.Query(False, False), proto.Query.parse(b'v?'))
-        self.assertEqual(proto.Query(True, False), proto.Query.parse(b'?v?'))
-        self.assertEqual(proto.Query(True, False), proto.Query.parse(b'?'))
-        self.assertEqual(proto.Query(False, True), proto.Query.parse(b'v2?'))
-        self.assertEqual(proto.Query(False, True), proto.Query.parse(b'v2831?'))
-        self.assertEqual(proto.Query(False, False), proto.Query.parse(b'v1?'))
-        self.assertEqual(proto.Query(True, True), proto.Query.parse(b'?v2?'))
-        self.assertEqual(proto.Query(True, True), proto.Query.parse(b'?v20xy?'))
+    def taggedBoth(self, text, suffix, vset):
+        self.assertEqual(text + suffix, bytes(proto.TaggedPlaintext(text, vset)))
+        self.assertEqual(proto.TaggedPlaintext(text, vset),
+                proto.TaggedPlaintext.parse(text + suffix))
+
+    def testQuery(self):
+        # these are "canonical" representations
+        self.queryBoth(b'v?', set())
+        self.queryBoth(b'v2?', set([2]))
+        self.queryBoth(b'?v?', set([1]))
+        self.queryBoth(b'?v2?', set([1, 2]))
+
+        # these should be parsable but should not be produced
+        self.assertEqual(proto.Query(set([1])), proto.Query.parse(b'?'))
+        self.assertEqual(proto.Query(set([1])), proto.Query.parse(b'v1?'))
+        self.assertEqual(proto.Query(set([1,2,3,8])), proto.Query.parse(b'v2831?'))
+        self.assertEqual(proto.Query(set([0,1,2])), proto.Query.parse(b'?v20xy?'))
+
 
         # both version tags
-        self.assertEqual(proto.TaggedPlaintext(b'', True, True),
-                proto.TaggedPlaintext.parse(b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20'
+        self.taggedBoth(b'',
+                b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20'
                 + b'\x20\x09\x20\x09\x20\x20\x09\x20'
-                + b'\x20\x20\x09\x09\x20\x20\x09\x20'))
+                + b'\x20\x20\x09\x09\x20\x20\x09\x20',
+                set([1,2]))
         # text + only v1 version tag
-        self.assertEqual(proto.TaggedPlaintext(b'Hello World!\n', True, False),
-                proto.TaggedPlaintext.parse(b'Hello World!\n'
-                + b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20'
-                + b'\x20\x09\x20\x09\x20\x20\x09\x20'))
+        self.taggedBoth(b'Hello World!\n',
+                b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20'
+                + b'\x20\x09\x20\x09\x20\x20\x09\x20',
+                set([1]))
         # text + only v2 version tag
-        self.assertEqual(proto.TaggedPlaintext(b'Foo.\n', False, True),
-                proto.TaggedPlaintext.parse(b'Foo.\n'
-                + b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20'
-                + b'\x20\x20\x09\x09\x20\x20\x09\x20'))
+        self.taggedBoth(b'Foo.\n',
+                b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20'
+                + b'\x20\x20\x09\x09\x20\x20\x09\x20',
+                set([2]))
         # only base tag, no version supported
-        self.assertEqual(proto.TaggedPlaintext(b'', False, False),
-                proto.TaggedPlaintext.parse(b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20'))
+        self.taggedBoth(b'',
+                b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20',
+                set([]))
 
         # untagged
         self.assertRaises(TypeError,
