@@ -98,7 +98,7 @@ class DHSession(object):
 class CryptEngine(object):
     __slots__ = ['ctx', 'ake', 'sessionId', 'sessionIdHalf', 'theirKeyid',
             'theirY', 'theirOldY', 'ourOldDHKey', 'ourDHKey', 'ourKeyid',
-            'sessionkeys', 'theirPubkey', 'savedMacKeys', 'smp']
+            'sessionkeys', 'theirPubkey', 'savedMacKeys', 'smp', 'extraKey']
     def __init__(self, ctx):
         self.ctx = ctx
         self.ake = None
@@ -303,12 +303,15 @@ class CryptEngine(object):
         self.ourKeyid = ake.ourKeyid
         self.theirY = ake.gy
         self.theirOldY = None
+        self.extraKey = ake.extraKey
 
         if self.ourKeyid != ake.ourKeyid + 1 or self.ourOldDHKey != ake.dh.pub:
-            # XXX is this really ok?
             self.ourDHKey = ake.dh
             self.sessionkeys[0][0] = DHSession.create(self.ourDHKey, self.theirY)
             self.rotateDHKeys()
+
+        # we don't need the AKE anymore, free the reference
+        self.ake = None
 
         self.ctx._wentEncrypted()
         logger.info('went encrypted with {0}'.format(self.theirPubkey))
@@ -320,7 +323,7 @@ class AuthKeyExchange(object):
     __slots__ = ['privkey', 'state', 'r', 'encgx', 'hashgx', 'ourKeyid',
             'theirPubkey', 'theirKeyid', 'enc_c', 'enc_cp', 'mac_m1',
             'mac_m1p', 'mac_m2', 'mac_m2p', 'sessionId', 'dh', 'onSuccess',
-            'gy', 'lastmsg', 'sessionIdHalf']
+            'gy', 'lastmsg', 'sessionIdHalf','extraKey']
     def __init__(self, privkey, onSuccess):
         self.privkey = privkey
         self.state = STATE_NONE
@@ -446,13 +449,15 @@ class AuthKeyExchange(object):
     def createAuthKeys(self):
         s = pow(self.gy, self.dh.priv, DH1536_MODULUS)
         sbyte = pack_mpi(s)
-        self.sessionId = SHA256(b'\0' + sbyte)[:8]
-        enc = SHA256(b'\1' + sbyte)
-        self.enc_c, self.enc_cp = enc[:16], enc[16:]
-        self.mac_m1 = SHA256(b'\2' + sbyte)
-        self.mac_m2 = SHA256(b'\3' + sbyte)
-        self.mac_m1p = SHA256(b'\4' + sbyte)
-        self.mac_m2p = SHA256(b'\5' + sbyte)
+        self.sessionId = SHA256(b'\x00' + sbyte)[:8]
+        enc = SHA256(b'\x01' + sbyte)
+        self.enc_c = enc[:16]
+        self.enc_cp = enc[16:]
+        self.mac_m1 = SHA256(b'\x02' + sbyte)
+        self.mac_m2 = SHA256(b'\x03' + sbyte)
+        self.mac_m1p = SHA256(b'\x04' + sbyte)
+        self.mac_m2p = SHA256(b'\x05' + sbyte)
+        self.extraKey = SHA256(b'\xff' + sbyte)
 
     def calculatePubkeyAuth(self, key, mackey):
         pubkey = self.privkey.serializePublicKey()

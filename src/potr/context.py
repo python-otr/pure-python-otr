@@ -441,6 +441,22 @@ class Context(object):
         """Return the max message size for this context."""
         return self.user.maxMessageSize
 
+    def getExtraKey(self, extraKeyAppId=None, extraKeyAppData=None, appdata=None):
+        """ retrieves the generated extra symmetric key.
+
+        if extraKeyAppId is set, notifies the chat partner about intended
+        usage (additional application specific information can be supplied in
+        extraKeyAppData).
+
+        returns the 256 bit symmetric key """
+
+        if self.state != STATE_ENCRYPTED:
+            raise NotEncryptedError
+        if extraKeyAppId is not None:
+            tlvs=[proto.ExtraKeyTLV(extraKeyAppId, extraKeyAppData)]
+            self.sendInternal(b'', tlvs=tlvs, appdata=appdata)
+        return self.crypto.extraKey
+
 class Account(object):
     contextclass = Context
     def __init__(self, name, protocol, maxMessageSize, privkey=None):
@@ -451,10 +467,10 @@ class Account(object):
         self.ctxs = {}
         self.trusts = {}
         self.maxMessageSize = maxMessageSize
-        self.defaultQuery = b'?OTRv{versions}?\n{accountname} has requested ' \
-                b'an Off-the-Record private conversation.  However, you ' \
-                b'do not have a plugin to support that.\nSee '\
-                b'http://otr.cypherpunks.ca/ for more information.';
+        self.defaultQuery = '?OTRv{versions}?\n{accountname} has requested ' \
+                'an Off-the-Record private conversation.  However, you ' \
+                'do not have a plugin to support that.\nSee '\
+                'http://otr.cypherpunks.ca/ for more information.';
 
     def __repr__(self):
         return '<{cls}(name={name!r})>'.format(cls=self.__class__.__name__,
@@ -488,8 +504,9 @@ class Account(object):
         return self.ctxs[uid]
 
     def getDefaultQueryMessage(self, policy):
-        v  = b'2' if policy('ALLOW_V2') else b''
-        return self.defaultQuery.format(accountname=self.name, versions=v)
+        v  = '2' if policy('ALLOW_V2') else ''
+        msg = self.defaultQuery.format(accountname=self.name, versions=v)
+        return msg.encode('ascii')
 
     def setTrust(self, key, fingerprint, trustLevel):
         if key not in self.trusts:

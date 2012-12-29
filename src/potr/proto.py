@@ -329,6 +329,22 @@ class TLV(object):
         return not self.__eq__(other)
 
 @registertlv
+class PaddingTLV(TLV):
+    typ = 0
+
+    __slots__ = ['padding']
+
+    def __init__(self, padding):
+        self.padding = padding
+
+    def getPayload(self):
+        return self.padding
+
+    @classmethod
+    def parsePayload(cls, data):
+        return cls(data)
+
+@registertlv
 class DisconnectTLV(TLV):
     typ = 1
     def __init__(self):
@@ -417,3 +433,22 @@ class SMPABORTTLV(SMPTLV):
 
     def getPayload(self):
         return b''
+
+@registertlv
+class ExtraKeyTLV(TLV):
+    typ = 8
+
+    __slots__ = ['appid', 'appdata']
+
+    def __init__(self, appid, appdata):
+        self.appid = appid
+        self.appdata = appdata
+        if appdata is None:
+            self.appdata = b''
+
+    def getPayload(self):
+        return self.appid + self.appdata
+
+    @classmethod
+    def parsePayload(cls, data):
+        return cls(data[:4], data[4:])
