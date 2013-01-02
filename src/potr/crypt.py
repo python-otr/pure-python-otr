@@ -753,7 +753,7 @@ class SMPHandler:
 
         cprime = SHA256(struct.pack(b'B', v) + pack_mpi(temp1) + pack_mpi(temp2))
 
-        return long_to_bytes(c) == cprime
+        return long_to_bytes(c, 32) == cprime
 
     def proof_equal_logs(self, v):
         r = bytes_to_long(RNG.read(192))
@@ -775,7 +775,7 @@ class SMPHandler:
                 * pow(r, c, DH1536_MODULUS) % DH1536_MODULUS
 
         cprime = SHA256(struct.pack(b'B', v) + pack_mpi(temp1) + pack_mpi(temp2))
-        return long_to_bytes(c) == cprime
+        return long_to_bytes(c, 32) == cprime
 
 def proof_known_log(g, x, v):
     r = bytes_to_long(RNG.read(192))
@@ -787,7 +787,7 @@ def check_known_log(c, d, g, x, v):
     gd = pow(g, d, DH1536_MODULUS)
     xc = pow(x, c, DH1536_MODULUS)
     gdxc = gd * xc % DH1536_MODULUS
-    return SHA256(struct.pack(b'B', v) + pack_mpi(gdxc)) == long_to_bytes(c)
+    return SHA256(struct.pack(b'B', v) + pack_mpi(gdxc)) == long_to_bytes(c, 32)
 
 def invMod(n):
     return pow(n, DH1536_MODULUS_2, DH1536_MODULUS)

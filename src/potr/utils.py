@@ -43,11 +43,12 @@ def bytes_to_long(b):
         s += byte_to_long(b[i:i+1]) << 8*(l-i-1)
     return s
 
-def long_to_bytes(l):
+def long_to_bytes(l, n=0):
     b = b''
-    while l != 0:
+    while l != 0 or n > 0:
         b = long_to_byte(l & 0xff) + b
         l >>= 8
+        n -= 1
     return b
 
 def byte_to_long(b):

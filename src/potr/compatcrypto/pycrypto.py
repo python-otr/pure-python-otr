@@ -72,13 +72,11 @@ class Counter(object):
         return '<Counter(p={p!r},v={v!r})>'.format(p=self.prefix, v=self.val)
 
     def byteprefix(self):
-        return long_to_bytes(self.prefix).rjust(8, b'\0')
+        return long_to_bytes(self.prefix, 8)
 
     def __call__(self):
-        val = long_to_bytes(self.val)
-        prefix = long_to_bytes(self.prefix)
         self.val += 1
-        return self.byteprefix() + val.rjust(8, b'\0')
+        return self.byteprefix() + long_to_bytes(self.val, 8)
 
 @common.registerkeytype
 class DSAKey(common.PK):
@@ -114,7 +112,7 @@ class DSAKey(common.PK):
         # 2 <= K <= q = 160bit = 20 byte
         K = bytes_to_long(RNG.read(19)) + 2
         r, s = self.priv.sign(data, K)
-        return long_to_bytes(r) + long_to_bytes(s)
+        return long_to_bytes(r, 20) + long_to_bytes(s, 20)
 
     def verify(self, data, sig):
         r, s = bytes_to_long(sig[:20]), bytes_to_long(sig[20:])
