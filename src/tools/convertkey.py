@@ -16,8 +16,7 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-import pickle
-from potr.crypt import DSAKey
+from potr.compatcrypto.pycrypto import DSAKey
 
 def parse(tokens):
     key = tokens.pop(0)[1:]
@@ -46,11 +45,11 @@ def convert(path):
     oldkey = parse(tokens)[0]['privkeys']['account']
 
     k = oldkey['private-key']['dsa']
-    newkey = DSAKey((k['y'],k['g'],k['p'],k['q'],k['x']))
+    newkey = DSAKey((k['y'],k['g'],k['p'],k['q'],k['x']), private=True)
     print('Writing converted key for %s/%s to %s' % (oldkey['name'],
             oldkey['protocol'], path+'2'))
-    with open(path+'2', 'w') as f:
-        pickle.dump(newkey, f)
+    with open(path+'3', 'wb') as f:
+        f.write(newkey.serializePrivateKey())
 
 if __name__ == '__main__':
     import sys
