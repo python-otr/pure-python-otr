@@ -5,9 +5,18 @@ from __future__ import unicode_literals
 import unittest
 import base64
 from potr import proto
+from potr import utils
 
 
 class ProtoTest(unittest.TestCase):
+    def testLongToBytes(self):
+        self.assertEqual(b'\xde\xad\xbe\xef', 
+                utils.long_to_bytes(0xdeadbeef))
+        self.assertEqual(b'\0\0\0\0\0\0\xde\xad\xbe\xef', 
+                utils.long_to_bytes(0xdeadbeef, 10))
+        self.assertEqual(b'', utils.long_to_bytes(0x00))
+        self.assertEqual(b'\0\0\0\0\0\0\0\0\0\0', utils.long_to_bytes(0x00, 10))
+
     def testPackData(self):
         self.assertEqual(b'\0\0\0\0', proto.pack_data(b''))
         self.assertEqual(b'\0\0\0\x0afoobarbazx', proto.pack_data(b'foobarbazx'))
@@ -84,15 +93,6 @@ class ProtoTest(unittest.TestCase):
         self.taggedBoth(b'',
                 b'\x20\x09\x20\x20\x09\x09\x09\x09\x20\x09\x20\x09\x20\x09\x20\x20',
                 set([]))
-
-        # untagged
-        self.assertRaises(TypeError,
-                lambda: proto.TaggedPlaintext.parse(b'Foobarbaz?'))
-
-        # only the version tag without base
-        self.assertRaises(TypeError,
-                lambda: proto.TaggedPlaintext.parse(b'Foobarbaz!'
-                    + b'\x20\x09\x20\x09\x20\x20\x09\x20'))
 
     def testGenericMsg(self):
         msg = base64.b64encode(proto.pack_data(b'foo'))
