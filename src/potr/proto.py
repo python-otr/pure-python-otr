@@ -107,48 +107,6 @@ class OTRMessage(object):
                 return False
         return True
 
-    @staticmethod
-    def parse(data, ctx):
-        otrTagPos = data.find(OTRTAG)
-        if otrTagPos == -1:
-            return TaggedPlaintext.parse(data)
-
-        indexBase = otrTagPos + len(OTRTAG)
-        compare = data[indexBase]
-
-        if compare == b','[0]:
-            data = ctx.fragment.process(data[indexBase:])
-            if data is None:
-                return None
-            return OTRMessage.parse(data, ctx)
-        else:
-            ctx.fragment.discard()
-
-        hasq = compare == b'?'[0]
-        hasv = compare == b'v'[0]
-        if hasq or hasv:
-            hasv |= len(data) > indexBase+1 and \
-                    data[indexBase+1] == b'v'[0]
-            if hasv:
-                end = data.find(b'?', indexBase+1)
-            else:
-                end = indexBase+1
-            payload = data[indexBase:end]
-            return Query.parse(payload)
-
-        if compare == b':'[0] and len(data) > indexBase + 4:
-            infoTag = base64.b64decode(data[indexBase+1:indexBase+5])
-            classInfo = struct.unpack(b'!HB', infoTag)
-            cls = messageClasses.get(classInfo, None)
-            if cls is None:
-                return data
-            return cls.parsePayload(data[indexBase+5:])
-
-        if data[indexBase:indexBase+7] == b' Error:':
-            return Error(data[indexBase+7:])
-
-        return data
-
     def __neq__(self, other):
         return not self.__eq__(other)
 
@@ -220,7 +178,8 @@ class TaggedPlaintext(Query):
     def parse(cls, data):
         tagPos = data.find(MESSAGE_TAG_BASE)
         if tagPos < 0:
-            return data
+            raise TypeError(
+                    'this is not a tagged plaintext ({0!r:.20})'.format(data))
 
         tags = [ data[i:i+8] for i in range(tagPos, len(data), 8) ]
         versions = set([ version for version, tag in MESSAGE_TAGS.items() if tag
