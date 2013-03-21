@@ -12,7 +12,7 @@ Install the potr Python module:
 Note that this will install (but not activate) the gajim-otr plugin if a
 gajim directory can be found in $PREFIX/share/gajim.
 
-__Dependencies__: pycrypto >= 2.1 (see [dlitz/pycrypto](/dlitz/pycrypto))
+__Dependencies__: pycrypto >= 2.1 (see [dlitz/pycrypto](https://github.com/dlitz/pycrypto))
 
 Gajim OTR Plugin
 ================
@@ -29,8 +29,8 @@ interface.
 
 Reporting bugs
 ==============
-Please read the [FAQ](/afflux/pure-python-otr/wiki) before submitting your
-issue to the [tracker](/afflux/pure-python-otr/issues).
+Please read the [FAQ](https://github.com/afflux/pure-python-otr/wiki) before submitting your
+issue to the [tracker](https://github.com/afflux/pure-python-otr/issues).
 
 libotr SWIG bindings
 ====================
