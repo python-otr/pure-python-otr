@@ -75,8 +75,9 @@ class Counter(object):
         return long_to_bytes(self.prefix, 8)
 
     def __call__(self):
+        bytesuffix = long_to_bytes(self.val, 8)
         self.val += 1
-        return self.byteprefix() + long_to_bytes(self.val, 8)
+        return self.byteprefix() + bytesuffix
 
 @common.registerkeytype
 class DSAKey(common.PK):
