@@ -537,7 +537,7 @@ class OtrPlugin(GajimPlugin):
 
         try:
             ctx = self.us[account].getContext(event.fjid)
-            msgtxt, tlvs = ctx.receiveMessage(event.msgtxt,
+            msgtxt, tlvs = ctx.receiveMessage(event.msgtxt.encode('utf8'),
                             appdata={'session':event.session})
         except potr.context.NotOTRMessage, e:
             # received message was not OTR - pass it on
@@ -583,10 +583,10 @@ class OtrPlugin(GajimPlugin):
             ctx.smpWindow.handle_tlv(tlvs)
 
         stripper = HTMLStripper()
-        stripper.feed(unicode(msgtxt or ''))
+        stripper.feed((msgtxt or '').decode('utf8'))
         event.msgtxt = stripper.stripped_data
         event.stanza.setBody(event.msgtxt)
-        event.stanza.setXHTML(msgtxt)
+        event.stanza.setXHTML((msgtxt or '').decode('utf8'))
 
         return PASS
 
@@ -606,6 +606,7 @@ class OtrPlugin(GajimPlugin):
                 fjid += '/' + event.resource
 
         message = event.xhtml or escape(event.message)
+        message = message.encode('utf8')
 
         try:
             newmsg = self.us[event.account].getContext(fjid).sendMessage(
@@ -624,7 +625,7 @@ class OtrPlugin(GajimPlugin):
             event.xhtml = newmsg
 
         stripper = HTMLStripper()
-        stripper.feed(unicode(newmsg or ''))
+        stripper.feed((newmsg or '').decode('utf8'))
         event.message = stripper.stripped_data
 
         return PASS
