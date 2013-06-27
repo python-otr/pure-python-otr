@@ -63,8 +63,8 @@ OFFER_ACCEPTED = 3
 
 class Context(object):
     __slots__ = ['user', 'policy', 'crypto', 'tagOffer', 'lastSend',
-            'lastMessage', 'mayRetransmit', 'fragment', 'fragmentInfo', 'state',
-            'inject', 'trust', 'peer', 'trustName']
+            'lastMessage', 'mayRetransmit', 'fragment', 'fragmentInfo',
+            'state', 'trust', 'peer', 'trustName']
 
     def __init__(self, account, peername):
         self.user = account
