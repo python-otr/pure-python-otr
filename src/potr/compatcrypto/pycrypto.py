@@ -54,7 +54,6 @@ def AESCTR(key, counter=0):
     return Cipher.AES.new(key, Cipher.AES.MODE_CTR, counter=counter)
 
 class Counter(object):
-    __slots__ = ['prefix', 'val']
     def __init__(self, prefix):
         self.prefix = prefix
         self.val = 0
@@ -81,7 +80,6 @@ class Counter(object):
 
 @common.registerkeytype
 class DSAKey(common.PK):
-    __slots__ = ['priv', 'pub']
     keyType = 0x0000
 
     def __init__(self, key=None, private=False):

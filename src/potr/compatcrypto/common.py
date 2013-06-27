@@ -35,8 +35,6 @@ def generateDefaultKey():
     return pkTypes[DEFAULT_KEYTYPE].generate()
 
 class PK(object):
-    __slots__ = []
-
     @classmethod
     def generate(cls):
         raise NotImplementedError

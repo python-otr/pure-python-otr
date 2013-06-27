@@ -47,7 +47,6 @@ def check_exp(n):
     return 1 <= n < SM_ORDER
 
 class DH(object):
-    __slots__ = ['priv', 'pub']
     @classmethod
     def set_params(cls, prime, gen):
         cls.prime = prime
@@ -60,8 +59,6 @@ class DH(object):
 DH.set_params(DH1536_MODULUS, DH1536_GENERATOR)
 
 class DHSession(object):
-    __slots__ = ['sendenc', 'sendmac', 'rcvenc', 'rcvmac', 'sendctr', 'rcvctr',
-            'sendmacused', 'rcvmacused']
     def __init__(self, sendenc, sendmac, rcvenc, rcvmac):
         self.sendenc = sendenc
         self.sendmac = sendmac
@@ -96,9 +93,6 @@ class DHSession(object):
         return cls(sendenc, sendmac, rcvenc, rcvmac)
 
 class CryptEngine(object):
-    __slots__ = ['ctx', 'ake', 'sessionId', 'sessionIdHalf', 'theirKeyid',
-            'theirY', 'theirOldY', 'ourOldDHKey', 'ourDHKey', 'ourKeyid',
-            'sessionkeys', 'theirPubkey', 'savedMacKeys', 'smp', 'extraKey']
     def __init__(self, ctx):
         self.ctx = ctx
         self.ake = None
@@ -320,10 +314,6 @@ class CryptEngine(object):
         self.smp = None
 
 class AuthKeyExchange(object):
-    __slots__ = ['privkey', 'state', 'r', 'encgx', 'hashgx', 'ourKeyid',
-            'theirPubkey', 'theirKeyid', 'enc_c', 'enc_cp', 'mac_m1',
-            'mac_m1p', 'mac_m2', 'mac_m2p', 'sessionId', 'dh', 'onSuccess',
-            'gy', 'lastmsg', 'sessionIdHalf','extraKey']
     def __init__(self, privkey, onSuccess):
         self.privkey = privkey
         self.state = STATE_NONE
@@ -495,9 +485,6 @@ SMPPROG_FAILED = -1
 SMPPROG_SUCCEEDED = 1
 
 class SMPHandler:
-    __slots__ = ['crypto', 'questionReceived', 'prog', 'state', 'g1', 'g3o',
-            'x2', 'x3', 'g2', 'g3', 'pab', 'qab', 'secret', 'p', 'q']
-
     def __init__(self, crypto):
         self.crypto = crypto
         self.state = 1
