@@ -25,7 +25,7 @@ try:
 
     args['install_requires']=['pycrypto>=2.1']
 except ImportError:
-    print '\n*** setuptools not found! Falling back to distutils\n\n'
+    print('\n*** setuptools not found! Falling back to distutils\n\n')
     from distutils.core import setup
 
     from distutils.command.install import install
