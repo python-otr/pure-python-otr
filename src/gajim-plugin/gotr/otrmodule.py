@@ -59,6 +59,7 @@ import os
 import pickle
 import time
 import sys
+from pprint import pformat
 
 import common.xmpp
 from common import gajim
@@ -595,6 +596,8 @@ class OtrPlugin(GajimPlugin):
             return PASS
 
         xep_200 = bool(event.session) and event.session.enable_encryption
+
+        potrrootlog.debug('got event {0} xep_200={1}'.format(pformat(event.__dict__), xep_200))
         if xep_200 or not event.message:
             return PASS
 
@@ -608,10 +611,13 @@ class OtrPlugin(GajimPlugin):
         message = event.xhtml or escape(event.message)
         message = message.encode('utf8')
 
+        potrrootlog.debug('processing message={0!r} from fjid={1!r}'.format(message, fjid))
+
         try:
             newmsg = self.us[event.account].getContext(fjid).sendMessage(
                     potr.context.FRAGMENT_SEND_ALL_BUT_LAST, message,
                     appdata={'session':event.session})
+            potrrootlog.debug('processed message={0!r}'.format(newmsg))
         except potr.context.NotEncryptedError, e:
             if e.args[0] == potr.context.EXC_FINISHED:
                 self.gajim_log(_('Your message was not send. Either end '
