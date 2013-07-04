@@ -206,7 +206,7 @@ class Context(object):
             if self.state != STATE_ENCRYPTED:
                 self.sendInternal(proto.Error(
                         'You sent encrypted to {user}, who wasn\'t expecting it.'
-                            .format(user=self.user.name)), appdata=appdata)
+                            .format(user=self.user.name).encode('utf-8')), appdata=appdata)
                 if ignore:
                     return IGN
                 raise NotEncryptedError(EXC_UNREADABLE_MESSAGE)
