@@ -258,7 +258,6 @@ class OtrPlugin(GajimPlugin):
     otr = None
     def init(self):
 
-        self.description = _('See http://www.cypherpunks.ca/otr/')
         self.us = {}
 
 
