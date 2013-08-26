@@ -96,13 +96,19 @@ class Context(object):
         params = message.split(b',')
         if len(params) < 5 or not params[1].isdigit() or not params[2].isdigit():
             logger.warning('invalid formed fragmented message: %r', params)
-            return None
+            self.discardFragment()
+            return message
 
 
         K, N = self.fragmentInfo
+        try:
+            k = int(params[1])
+            n = int(params[2])
+        except ValueError:
+            logger.warning('invalid formed fragmented message: %r', params)
+            self.discardFragment()
+            return message
 
-        k = int(params[1])
-        n = int(params[2])
         fragData = params[3]
 
         logger.debug(params)
@@ -120,7 +126,7 @@ class Context(object):
             # bad, discard
             self.discardFragment()
             logger.warning('invalid fragmented message: %r', params)
-            return None
+            return message
 
         if n == k > 0:
             assembled = b''.join(self.fragment)
@@ -259,12 +265,13 @@ class Context(object):
         return msg
 
     def processOutgoingMessage(self, msg, flags, tlvs=[]):
-        if isinstance(self.parse(msg), proto.Query):
+        isQuery = self.parseExplicitQuery(msg) is not None
+        if isQuery:
             return self.user.getDefaultQueryMessage(self.getPolicy)
 
         if self.state == STATE_PLAINTEXT:
             if self.getPolicy('REQUIRE_ENCRYPTION'):
-                if not isinstance(self.parse(msg), proto.Query):
+                if not isQuery:
                     self.lastMessage = msg
                     self.lastSend = time()
                     self.mayRetransmit = 2
@@ -386,7 +393,33 @@ class Context(object):
     def authStartV2(self, appdata=None):
         self.crypto.startAKE(appdata=appdata)
 
-    def parse(self, message):
+    def parseExplicitQuery(self, message):
+        otrTagPos = message.find(proto.OTRTAG)
+
+        if otrTagPos == -1:
+            return None
+
+        indexBase = otrTagPos + len(proto.OTRTAG)
+
+        if len(message) <= indexBase:
+            return None
+
+        compare = message[indexBase]
+
+        hasq = compare == b'?'[0]
+        hasv = compare == b'v'[0]
+
+        if not hasq and not hasv:
+            return None
+
+        hasv |= len(message) > indexBase+1 and message[indexBase+1] == b'v'[0]
+        if hasv:
+            end = message.find(b'?', indexBase+1)
+        else:
+            end = indexBase+1
+        return message[indexBase:end]
+
+    def parse(self, message, nofragment=False):
         otrTagPos = message.find(proto.OTRTAG)
         if otrTagPos == -1:
             if proto.MESSAGE_TAG_BASE in message:
@@ -395,38 +428,40 @@ class Context(object):
                 return message
 
         indexBase = otrTagPos + len(proto.OTRTAG)
+
+        if len(message) <= indexBase:
+            return message
+
         compare = message[indexBase]
 
-        if compare == b','[0]:
+        if nofragment is False and compare == b','[0]:
             message = self.fragmentAccumulate(message[indexBase:])
             if message is None:
                 return None
             else:
-                return self.parse(message)
+                return self.parse(message, nofragment=True)
         else:
             self.discardFragment()
 
-        hasq = compare == b'?'[0]
-        hasv = compare == b'v'[0]
-        if hasq or hasv:
-            hasv |= len(message) > indexBase+1 and \
-                    message[indexBase+1] == b'v'[0]
-            if hasv:
-                end = message.find(b'?', indexBase+1)
-            else:
-                end = indexBase+1
-            payload = message[indexBase:end]
-            return proto.Query.parse(payload)
+        queryPayload = self.parseExplicitQuery(message)
+        if queryPayload is not None:
+            return proto.Query.parse(queryPayload)
 
         if compare == b':'[0] and len(message) > indexBase + 4:
-            infoTag = base64.b64decode(message[indexBase+1:indexBase+5])
-            classInfo = struct.unpack(b'!HB', infoTag)
-            cls = proto.messageClasses.get(classInfo, None)
-            if cls is None:
+            try:
+                infoTag = base64.b64decode(message[indexBase+1:indexBase+5])
+                classInfo = struct.unpack(b'!HB', infoTag)
+
+                cls = proto.messageClasses.get(classInfo, None)
+                if cls is None:
+                    return message
+
+                logger.debug('{user} got msg {typ!r}' \
+                        .format(user=self.user.name, typ=cls))
+                return cls.parsePayload(message[indexBase+5:])
+            except (TypeError, struct.error):
+                logger.exception('could not parse OTR message %s', message)
                 return message
-            logger.debug('{user} got msg {typ!r}' \
-                    .format(user=self.user.name, typ=cls))
-            return cls.parsePayload(message[indexBase+5:])
 
         if message[indexBase:indexBase+7] == b' Error:':
             return proto.Error(message[indexBase+7:])

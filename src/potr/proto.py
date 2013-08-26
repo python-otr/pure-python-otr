@@ -130,7 +130,7 @@ class Query(OTRMessage):
     def parse(cls, data):
         if not isinstance(data, bytes):
             raise TypeError('can only parse bytes')
-        udata = data.decode('ascii')
+        udata = data.decode('ascii', errors='replace')
 
         versions = set()
         if len(udata) > 0 and udata[0] == '?':
