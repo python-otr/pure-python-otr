@@ -26,8 +26,8 @@ from potr.utils import human_hash, bytes_to_long, unpack, pack_mpi
 DEFAULT_KEYTYPE = 0x0000
 pkTypes = {}
 def registerkeytype(cls):
-    if not hasattr(cls, 'parsePayload'):
-        raise TypeError('registered key types need parsePayload()')
+    if cls.keyType is None:
+        raise TypeError('registered key class needs a type value')
     pkTypes[cls.keyType] = cls
     return cls
 
@@ -35,8 +35,14 @@ def generateDefaultKey():
     return pkTypes[DEFAULT_KEYTYPE].generate()
 
 class PK(object):
+    keyType = None
+
     @classmethod
     def generate(cls):
+        raise NotImplementedError
+
+    @classmethod
+    def parsePayload(cls, data, private=False):
         raise NotImplementedError
 
     def sign(self, data):
@@ -78,13 +84,13 @@ class PK(object):
     @classmethod
     def parsePrivateKey(cls, data):
         implCls, data = cls.getImplementation(data)
-        logging.debug('Got privkey of type %r' % implCls)
+        logging.debug('Got privkey of type %r', implCls)
         return implCls.parsePayload(data, private=True)
 
     @classmethod
     def parsePublicKey(cls, data):
         implCls, data = cls.getImplementation(data)
-        logging.debug('Got pubkey of type %r' % implCls)
+        logging.debug('Got pubkey of type %r', implCls)
         return implCls.parsePayload(data)
 
     def __str__(self):

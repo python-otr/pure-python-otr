@@ -19,7 +19,7 @@
 from __future__ import unicode_literals
 
 try:
-    basestring = basestring
+    type(basestring)
 except NameError:
     # all strings are unicode in python3k
     basestring = str
@@ -27,7 +27,7 @@ except NameError:
 
 # callable is not available in python 3.0 and 3.1
 try:
-    callable = callable
+    type(callable)
 except NameError:
     from collections import Callable
     def callable(x):
@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 from potr import crypt
 from potr import proto
+from potr import compatcrypto
 
 from time import time
 
@@ -67,13 +68,16 @@ class Context(object):
         self.peer = peername
         self.policy = {}
         self.crypto = crypt.CryptEngine(self)
-        self.discardFragment()
         self.tagOffer = OFFER_NOTSENT
         self.mayRetransmit = 0
         self.lastSend = 0
         self.lastMessage = None
         self.state = STATE_PLAINTEXT
         self.trustName = self.peer
+
+        self.fragmentInfo = None
+        self.fragment = None
+        self.discardFragment()
 
     def getPolicy(self, key):
         raise NotImplementedError
@@ -116,11 +120,11 @@ class Context(object):
         if n >= k == 1:
             # first fragment
             self.discardFragment()
-            self.fragmentInfo = (k,n)
+            self.fragmentInfo = (k, n)
             self.fragment.append(fragData)
         elif N == n >= k > 1 and k == K+1:
             # accumulate
-            self.fragmentInfo = (k,n)
+            self.fragmentInfo = (k, n)
             self.fragment.append(fragData)
         else:
             # bad, discard
@@ -311,9 +315,9 @@ class Context(object):
     def sendFragmented(self, msg, policy=FRAGMENT_SEND_ALL, appdata=None):
         mms = self.maxMessageSize(appdata)
         msgLen = len(msg)
-        if mms != 0 and len(msg) > mms:
+        if mms != 0 and msgLen > mms:
             fms = mms - 19
-            fragments = [ msg[i:i+fms] for i in range(0, len(msg), fms) ]
+            fragments = [ msg[i:i+fms] for i in range(0, msgLen, fms) ]
 
             fc = len(fragments)
 
@@ -484,7 +488,7 @@ class Context(object):
         if self.state != STATE_ENCRYPTED:
             raise NotEncryptedError
         if extraKeyAppId is not None:
-            tlvs=[proto.ExtraKeyTLV(extraKeyAppId, extraKeyAppData)]
+            tlvs = [proto.ExtraKeyTLV(extraKeyAppId, extraKeyAppData)]
             self.sendInternal(b'', tlvs=tlvs, appdata=appdata)
         return self.crypto.extraKey
 
@@ -501,7 +505,7 @@ class Account(object):
         self.defaultQuery = '?OTRv{versions}?\n{accountname} has requested ' \
                 'an Off-the-Record private conversation.  However, you ' \
                 'do not have a plugin to support that.\nSee '\
-                'http://otr.cypherpunks.ca/ for more information.';
+                'http://otr.cypherpunks.ca/ for more information.'
 
     def __repr__(self):
         return '<{cls}(name={name!r})>'.format(cls=self.__class__.__name__,
@@ -512,7 +516,7 @@ class Account(object):
             self.privkey = self.loadPrivkey()
         if self.privkey is None:
             if autogen is True:
-                self.privkey = crypt.generateDefaultKey()
+                self.privkey = compatcrypto.generateDefaultKey()
                 self.savePrivkey()
             else:
                 raise LookupError

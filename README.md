@@ -14,6 +14,11 @@ gajim directory can be found in $PREFIX/share/gajim.
 
 __Dependencies__: pycrypto >= 2.1 (see [dlitz/pycrypto](https://github.com/dlitz/pycrypto))
 
+Usage Notes
+===========
+This module uses pycrypto's RNG. If you use this package in your application and your application
+uses `os.fork()`, make sure to call `Crypto.Random.atfork()` in both the parent and the child process.
+
 Gajim OTR Plugin
 ================
 As mentioned above, a gajim-otr plugin is provided in src/gajim-plugin and

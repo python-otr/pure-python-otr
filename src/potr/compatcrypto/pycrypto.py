@@ -15,18 +15,16 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-from Crypto import Cipher, Random
+from Crypto import Cipher
 from Crypto.Hash import SHA256 as _SHA256
-from Crypto.Hash import SHA as _SHA1                                                                                                                                                                                                      
+from Crypto.Hash import SHA as _SHA1
 from Crypto.Hash import HMAC as _HMAC
 from Crypto.PublicKey import DSA
+from Crypto.Random import random
 from numbers import Number
 
 from potr.compatcrypto import common
-from potr.utils import pack_mpi, read_mpi, bytes_to_long, long_to_bytes
-
-# XXX atfork?
-RNG = Random.new()
+from potr.utils import read_mpi, bytes_to_long, long_to_bytes
 
 def SHA256(data):
     return _SHA256.new(data).digest()
@@ -108,8 +106,8 @@ class DSAKey(common.PK):
         return SHA1(self.getSerializedPublicPayload())
 
     def sign(self, data):
-        # 2 <= K <= q = 160bit = 20 byte
-        K = bytes_to_long(RNG.read(19)) + 2
+        # 2 <= K <= q
+        K = random.randrange(2, self.priv.q)
         r, s = self.priv.sign(data, K)
         return long_to_bytes(r, 20) + long_to_bytes(s, 20)
 
