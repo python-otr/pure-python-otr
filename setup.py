@@ -121,7 +121,7 @@ setup(
 
 
     name='python-potr',
-    version='1.0.0b6',
+    version='1.0.0b7',
     description='pure Python Off-The-Record encryption',
     long_description='''This is a pure Python OTR implementation; it does not bind to libotr.
 

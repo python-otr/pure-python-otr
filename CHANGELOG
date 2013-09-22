@@ -1,3 +1,11 @@
+1.0.0beta7 (2013-09-22)
+ - potr: work towards supporting OTRv3. no instance tag support yet.
+ - potr: fixed some MPI paddings
+ - potr: various message encoding fixes / unification
+ - potr: general cleanup
+ - gotr: handle exceptions, allow for some more debugging
+ - this will eventually become a 1.0.0 release when I get some positive feedback
+
 1.0.0beta6 (2012-10-17)
  - potr: max message size can be set per context/message
  - gotr: handle html messages

@@ -24,4 +24,4 @@ from potr.utils import human_hash
 
 ''' version is: (major, minor, patch, sub) with sub being one of 'alpha',
 'beta', 'final' '''
-VERSION = (1, 0, 0, 'beta5')
+VERSION = (1, 0, 0, 'beta7')
