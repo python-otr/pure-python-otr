@@ -143,7 +143,7 @@ interface.
 Reporting bugs
 ==============
 Please read the `FAQ <https://github.com/afflux/pure-python-otr/wiki>`_ before submitting your
-issue to the `tracker <https:///afflux/pure-python-otr/issues>`_.''',
+issue to the `tracker <https://github.com/afflux/pure-python-otr/issues>`_.''',
 
     platforms='any',
     license='LGPLv3+',
@@ -152,7 +152,6 @@ issue to the `tracker <https:///afflux/pure-python-otr/issues>`_.''',
     author_email='afflux@pentabarf.de',
 
     url='http://python-otr.pentabarf.de',
-    download_url='https://github.com/afflux/pure-python-otr/downloads',
 
     classifiers=[
         'Development Status :: 4 - Beta',
