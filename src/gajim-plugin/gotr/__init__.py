@@ -1,1 +1,0 @@
-from otrmodule import OtrPlugin
