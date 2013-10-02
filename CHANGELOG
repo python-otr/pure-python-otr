@@ -1,5 +1,6 @@
-1.0.0 (future)
+1.0.0 (2013-10-02)
  - gotr: moved to separate reppository / source distribution
+ - tools: convertkey shebang changed to non-version-specific python
 
 1.0.0beta7 (2013-09-22)
  - potr: work towards supporting OTRv3. no instance tag support yet.

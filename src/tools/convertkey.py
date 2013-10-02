@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python
 #    Copyright 2011 Kjell Braden <afflux@pentabarf.de>
 #
 #    This file is part of the python-potr library.
