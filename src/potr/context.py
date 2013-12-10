@@ -215,8 +215,8 @@ class Context(object):
 
             if self.state != STATE_ENCRYPTED:
                 self.sendInternal(proto.Error(
-                        'You sent encrypted to {user}, who wasn\'t expecting it.'
-                            .format(user=self.user.name).encode('utf-8')), appdata=appdata)
+                        'You sent encrypted data, but I wasn\'t expecting it.'
+                        ), appdata=appdata)
                 if ignore:
                     return IGN
                 raise NotEncryptedError(EXC_UNREADABLE_MESSAGE)
@@ -502,7 +502,7 @@ class Account(object):
         self.ctxs = {}
         self.trusts = {}
         self.maxMessageSize = maxMessageSize
-        self.defaultQuery = '?OTRv{versions}?\n{accountname} has requested ' \
+        self.defaultQuery = '?OTRv{versions}?\nI would like to start ' \
                 'an Off-the-Record private conversation.  However, you ' \
                 'do not have a plugin to support that.\nSee '\
                 'http://otr.cypherpunks.ca/ for more information.'
@@ -540,7 +540,7 @@ class Account(object):
 
     def getDefaultQueryMessage(self, policy):
         v  = '2' if policy('ALLOW_V2') else ''
-        msg = self.defaultQuery.format(accountname=self.name, versions=v)
+        msg = self.defaultQuery.format(versions=v)
         return msg.encode('ascii')
 
     def setTrust(self, key, fingerprint, trustLevel):
