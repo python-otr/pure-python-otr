@@ -503,7 +503,7 @@ class Account(object):
         self.trusts = {}
         self.maxMessageSize = maxMessageSize
         self.defaultQuery = '?OTRv{versions}?\nI would like to start ' \
-                'an Off-the-Record private conversation.  However, you ' \
+                'an Off-the-Record private conversation. However, you ' \
                 'do not have a plugin to support that.\nSee '\
                 'http://otr.cypherpunks.ca/ for more information.'
 
