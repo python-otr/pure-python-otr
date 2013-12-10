@@ -505,7 +505,7 @@ class Account(object):
         self.defaultQuery = '?OTRv{versions}?\nI would like to start ' \
                 'an Off-the-Record private conversation. However, you ' \
                 'do not have a plugin to support that.\nSee '\
-                'http://otr.cypherpunks.ca/ for more information.'
+                'https://otr.cypherpunks.ca/ for more information.'
 
     def __repr__(self):
         return '<{cls}(name={name!r})>'.format(cls=self.__class__.__name__,
