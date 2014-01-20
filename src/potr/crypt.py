@@ -241,6 +241,9 @@ class CryptEngine(object):
         msg = proto.DataMessage(flags, self.ourKeyid-1, self.theirKeyid,
                 long_to_bytes(self.ourDHKey.pub), sess.sendctr.byteprefix(),
                 encmsg, b'', b''.join(self.savedMacKeys))
+
+        self.savedMacKeys = []
+
         msg.mac = SHA1HMAC(sess.sendmac, msg.getMacedData())
         return msg
 
