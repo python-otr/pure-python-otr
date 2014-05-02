@@ -347,7 +347,7 @@ class AuthKeyExchange(object):
         self.lastmsg = None
 
     def startAKE(self):
-        self.r = long_to_bytes(random.getrandbits(128))
+        self.r = long_to_bytes(random.getrandbits(128), 16)
 
         gxmpi = pack_mpi(self.dh.pub)
 
