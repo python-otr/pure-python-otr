@@ -1,3 +1,8 @@
+1.0.1 (2014-10-16)
+ - removed internal username from messages to peers
+ - clear revealed macs
+ - don't drop leading zero bits from AES keys
+
 1.0.0 (2013-10-02)
  - gotr: moved to separate reppository / source distribution
  - tools: convertkey shebang changed to non-version-specific python
