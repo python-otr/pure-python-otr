@@ -52,7 +52,7 @@ def bytesAndStrings(cls):
     if hasByteStr:
         cls.__str__ = lambda self: self.__bytes__()
     else:
-        cls.__str__ = lambda self: str(self.__bytes__(), encoding='utf-8', errors='replace')
+        cls.__str__ = lambda self: str(self.__bytes__(), 'utf-8', 'replace')
     return cls
 
 def registermessage(cls):
