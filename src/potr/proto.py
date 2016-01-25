@@ -469,4 +469,3 @@ class ExtraKeyTLV(TLV):
 
 class UnknownTLV(RuntimeError):
     pass
-
