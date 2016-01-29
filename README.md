@@ -8,6 +8,9 @@ Install the potr Python module:
 
 __Dependencies__: pycrypto >= 2.1 (see [dlitz/pycrypto](https://github.com/dlitz/pycrypto))
 
+This software is experimental and potentially insecure. Do not rely on it
+=========================================================================
+
 Usage Notes
 ===========
 This module uses pycrypto's RNG. If you use this package in your application and your application
@@ -15,11 +18,5 @@ uses `os.fork()`, make sure to call `Crypto.Random.atfork()` in both the parent 
 
 Reporting bugs
 ==============
-Please read the [FAQ](https://github.com/afflux/pure-python-otr/wiki) before submitting your
-issue to the [tracker](https://github.com/afflux/pure-python-otr/issues).
-
-libotr SWIG bindings
-====================
-python-otr.pentabarf.de and pyotr.pentabarf.de redirect here.
-If you are still looking for the old C library bindings, they have moved
-to <http://python-otr-old.pentabarf.de/>
+Please read the [FAQ](https://github.com/python-otr/pure-python-otr/wiki) before submitting your
+issue to the [tracker](https://github.com/python-otr/pure-python-otr/issues).
