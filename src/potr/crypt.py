@@ -637,10 +637,10 @@ class SMPHandler:
             self.prog = SMPPROG_SUCCEEDED if self.pab == rab else SMPPROG_FAILED
 
             if self.prog != SMPPROG_SUCCEEDED:
-                logger.error('secrets don\'t match')
+                logger.error('SMP secrets don\'t match')
                 self.abort(appdata=appdata)
                 self.crypto.ctx.setCurrentTrust('')
-                return
+                raise ValueError('SMP secrets don\'t match')
 
             logger.info('secrets matched')
             if not self.questionReceived:
