@@ -15,6 +15,11 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
+try:
+  import Crypto
+except ImportError:
+  import crypto as Crypto
+
 from Crypto import Cipher
 from Crypto.Hash import SHA256 as _SHA256
 from Crypto.Hash import SHA as _SHA1
