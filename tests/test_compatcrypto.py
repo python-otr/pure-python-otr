@@ -1,15 +1,18 @@
+# pylint: disable=import-error
 # pylint: disable=invalid-name
 # pylint: disable=missing-docstring
+# pylint: disable=wrong-import-position
 
 from __future__ import unicode_literals
 
-import codecs
+import os
+import sys
 import unittest
 
 import potr
 
-def to_hex(s):
-    return codecs.getencoder('hex')(s)[0]
+sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
+from potr_test_helpers import to_hex
 
 class CompatCryptoTest(unittest.TestCase):
 
