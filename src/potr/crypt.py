@@ -23,7 +23,7 @@ import struct
 
 
 from potr.compatcrypto import SHA256, SHA1, SHA1HMAC, SHA256HMAC, \
-        SHA256HMAC160, Counter, AESCTR, PK, random
+        Counter, AESCTR, PK, random
 from potr.utils import bytes_to_long, long_to_bytes, pack_mpi, read_mpi
 from potr import proto
 
@@ -47,6 +47,9 @@ def check_group(n):
     return 2 <= n <= DH_MODULUS_2
 def check_exp(n):
     return 1 <= n < SM_ORDER
+
+def SHA256HMAC160(key, data):
+    return SHA256HMAC(key, data)[:20]
 
 class DH(object):
     @classmethod

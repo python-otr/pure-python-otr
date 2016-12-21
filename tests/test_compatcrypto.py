@@ -39,9 +39,3 @@ class CompatCryptoTest(unittest.TestCase):
         self.assertEqual(
             to_hex(potr.compatcrypto.SHA256HMAC(b'key', 'this is a test')),
             'a85e8284b3aabd90add3da46176bce8e10eff8eafd7d096d8ba7d9396623b894')
-
-    def test_SHA256HMAC160(self):
-        # echo -n 'this is a test' | openssl dgst -sha256 -hmac key | cut -c 1-40
-        self.assertEqual(
-            to_hex(potr.compatcrypto.SHA256HMAC160(b'key', 'this is a test')),
-            'a85e8284b3aabd90add3da46176bce8e10eff8ea')

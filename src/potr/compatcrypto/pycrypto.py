@@ -38,9 +38,6 @@ def SHA1HMAC(key, data):
 def SHA256HMAC(key, data):
     return _HMAC.new(key, msg=data, digestmod=_SHA256).digest()
 
-def SHA256HMAC160(key, data):
-    return SHA256HMAC(key, data)[:20]
-
 def AESCTR(key, counter=0):
     if isinstance(counter, Number):
         counter = Counter(counter)
