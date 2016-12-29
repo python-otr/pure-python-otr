@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/python-otr/pure-python-otr.svg?branch=master)](https://travis-ci.org/python-otr/pure-python-otr)
+
 Python OTR
 ==========
 This is a pure Python OTR implementation; it does not bind to libotr.
