@@ -32,17 +32,11 @@ def SHA256(data):
 def SHA1(data):
     return _SHA1.new(data).digest()
 
-def HMAC(key, data, mod):
-    return _HMAC.new(key, msg=data, digestmod=mod).digest()
-
 def SHA1HMAC(key, data):
-    return HMAC(key, data, _SHA1)
+    return _HMAC.new(key, msg=data, digestmod=_SHA1).digest()
 
 def SHA256HMAC(key, data):
-    return HMAC(key, data, _SHA256)
-
-def SHA256HMAC160(key, data):
-    return SHA256HMAC(key, data)[:20]
+    return _HMAC.new(key, msg=data, digestmod=_SHA256).digest()
 
 def AESCTR(key, counter=0):
     if isinstance(counter, Number):
