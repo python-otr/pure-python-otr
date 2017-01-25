@@ -39,3 +39,33 @@ class CompatCryptoTest(unittest.TestCase):
         self.assertEqual(
             to_hex(potr.compatcrypto.SHA256HMAC(b'key', b'this is a test')),
             b'a85e8284b3aabd90add3da46176bce8e10eff8eafd7d096d8ba7d9396623b894')
+
+    def test_AESCTR_default_counter(self):
+        key = potr.utils.long_to_bytes(
+            potr.compatcrypto.random.getrandbits(128), 16)
+
+        aes_encrypter = potr.compatcrypto.AESCTR(key)
+        ciphertext = aes_encrypter.encrypt(b'setec astronomy')
+
+        aes_decrypter = potr.compatcrypto.AESCTR(key)
+        self.assertEqual(aes_decrypter.decrypt(ciphertext), b'setec astronomy')
+
+    def test_AESCTR_number_counter(self):
+        key = potr.utils.long_to_bytes(
+            potr.compatcrypto.random.getrandbits(128), 16)
+
+        aes_encrypter = potr.compatcrypto.AESCTR(key, 2010)
+        ciphertext = aes_encrypter.encrypt(b'setec astronomy')
+
+        aes_decrypter = potr.compatcrypto.AESCTR(key, 2010)
+        self.assertEqual(aes_decrypter.decrypt(ciphertext), b'setec astronomy')
+
+    def test_AESCTR_counter_counter(self):
+        key = potr.utils.long_to_bytes(
+            potr.compatcrypto.random.getrandbits(128), 16)
+
+        aes_encrypter = potr.compatcrypto.AESCTR(key, potr.compatcrypto.Counter(2013))
+        ciphertext = aes_encrypter.encrypt(b'setec astronomy')
+
+        aes_decrypter = potr.compatcrypto.AESCTR(key, potr.compatcrypto.Counter(2013))
+        self.assertEqual(aes_decrypter.decrypt(ciphertext), b'setec astronomy')
