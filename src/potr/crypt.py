@@ -23,7 +23,7 @@ import struct
 
 
 from potr.compatcrypto import SHA256, SHA1, SHA1HMAC, SHA256HMAC, \
-        Counter, AESCTR, PK, random
+        Counter, AESCTR, PK, getrandbits, randrange
 from potr.utils import bytes_to_long, long_to_bytes, pack_mpi, read_mpi
 from potr import proto
 
@@ -58,7 +58,7 @@ class DH(object):
         cls.gen = gen
 
     def __init__(self):
-        self.priv = random.randrange(2, 2**320)
+        self.priv = randrange(2, 2**320)
         self.pub = pow(self.gen, self.priv, self.prime)
 
 DH.set_params(DH_MODULUS, DH_GENERATOR)
@@ -350,7 +350,7 @@ class AuthKeyExchange(object):
         self.lastmsg = None
 
     def startAKE(self):
-        self.r = long_to_bytes(random.getrandbits(128), 16)
+        self.r = long_to_bytes(getrandbits(128), 16)
 
         gxmpi = pack_mpi(self.dh.pub)
 
@@ -549,8 +549,8 @@ class SMPHandler:
 
             self.g3o = msg[3]
 
-            self.x2 = random.randrange(2, DH_MAX)
-            self.x3 = random.randrange(2, DH_MAX)
+            self.x2 = randrange(2, DH_MAX)
+            self.x3 = randrange(2, DH_MAX)
 
             self.g2 = pow(msg[0], self.x2, DH_MODULUS)
             self.g3 = pow(msg[3], self.x3, DH_MODULUS)
@@ -586,7 +586,7 @@ class SMPHandler:
                 self.abort(appdata=appdata)
                 return
 
-            r = random.randrange(2, DH_MAX)
+            r = randrange(2, DH_MAX)
             self.p = pow(self.g3, r, DH_MODULUS)
             msg = [self.p]
             qa1 = pow(self.g1, r, DH_MODULUS)
@@ -689,8 +689,8 @@ class SMPHandler:
 
             self.secret = bytes_to_long(combSecret)
 
-            self.x2 = random.randrange(2, DH_MAX)
-            self.x3 = random.randrange(2, DH_MAX)
+            self.x2 = randrange(2, DH_MAX)
+            self.x3 = randrange(2, DH_MAX)
 
             msg = [pow(self.g1, self.x2, DH_MODULUS)]
             msg += proof_known_log(self.g1, self.x2, 1)
@@ -715,7 +715,7 @@ class SMPHandler:
             msg.append(pow(self.g1, self.x3, DH_MODULUS))
             msg += proof_known_log(self.g1, self.x3, 4)
 
-            r = random.randrange(2, DH_MAX)
+            r = randrange(2, DH_MAX)
 
             self.p = pow(self.g3, r, DH_MODULUS)
             msg.append(self.p)
@@ -731,8 +731,8 @@ class SMPHandler:
             self.sendTLV(proto.SMP2TLV(msg), appdata=appdata)
 
     def proof_equal_coords(self, r, v):
-        r1 = random.randrange(2, DH_MAX)
-        r2 = random.randrange(2, DH_MAX)
+        r1 = randrange(2, DH_MAX)
+        r2 = randrange(2, DH_MAX)
         temp2 = pow(self.g1, r1, DH_MODULUS) \
                 * pow(self.g2, r2, DH_MODULUS) % DH_MODULUS
         temp1 = pow(self.g3, r1, DH_MODULUS)
@@ -761,7 +761,7 @@ class SMPHandler:
         return long_to_bytes(c, 32) == cprime
 
     def proof_equal_logs(self, v):
-        r = random.randrange(2, DH_MAX)
+        r = randrange(2, DH_MAX)
         temp1 = pow(self.g1, r, DH_MODULUS)
         temp2 = pow(self.qab, r, DH_MODULUS)
 
@@ -783,7 +783,7 @@ class SMPHandler:
         return long_to_bytes(c, 32) == cprime
 
 def proof_known_log(g, x, v):
-    r = random.randrange(2, DH_MAX)
+    r = randrange(2, DH_MAX)
     c = bytes_to_long(SHA256(struct.pack(b'B', v) + pack_mpi(pow(g, r, DH_MODULUS))))
     temp = x * c % SM_ORDER
     return c, (r-temp) % SM_ORDER

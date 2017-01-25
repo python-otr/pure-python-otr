@@ -20,7 +20,7 @@ from Crypto.Hash import SHA256 as _SHA256
 from Crypto.Hash import SHA as _SHA1
 from Crypto.Hash import HMAC as _HMAC
 from Crypto.PublicKey import DSA
-from Crypto.Random import random
+import Crypto.Random.random
 from numbers import Number
 
 from potr.compatcrypto import common
@@ -101,7 +101,7 @@ class DSAKey(common.PK):
 
     def sign(self, data):
         # 2 <= K <= q
-        K = random.randrange(2, self.priv.q)
+        K = randrange(2, self.priv.q)
         r, s = self.priv.sign(data, K)
         return long_to_bytes(r, 20) + long_to_bytes(s, 20)
 
@@ -136,3 +136,9 @@ class DSAKey(common.PK):
             x, data = read_mpi(data)
             return cls((y, g, p, q, x), private=True), data
         return cls((y, g, p, q), private=False), data
+
+def getrandbits(k):
+    return Crypto.Random.random.getrandbits(k)
+
+def randrange(start, stop):
+    return Crypto.Random.random.randrange(start, stop)

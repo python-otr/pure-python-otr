@@ -42,7 +42,7 @@ class CompatCryptoTest(unittest.TestCase):
 
     def test_AESCTR_default_counter(self):
         key = potr.utils.long_to_bytes(
-            potr.compatcrypto.random.getrandbits(128), 16)
+            potr.compatcrypto.getrandbits(128), 16)
 
         aes_encrypter = potr.compatcrypto.AESCTR(key)
         ciphertext = aes_encrypter.encrypt(b'setec astronomy')
@@ -52,7 +52,7 @@ class CompatCryptoTest(unittest.TestCase):
 
     def test_AESCTR_number_counter(self):
         key = potr.utils.long_to_bytes(
-            potr.compatcrypto.random.getrandbits(128), 16)
+            potr.compatcrypto.getrandbits(128), 16)
 
         aes_encrypter = potr.compatcrypto.AESCTR(key, 2010)
         ciphertext = aes_encrypter.encrypt(b'setec astronomy')
@@ -62,10 +62,23 @@ class CompatCryptoTest(unittest.TestCase):
 
     def test_AESCTR_counter_counter(self):
         key = potr.utils.long_to_bytes(
-            potr.compatcrypto.random.getrandbits(128), 16)
+            potr.compatcrypto.getrandbits(128), 16)
 
         aes_encrypter = potr.compatcrypto.AESCTR(key, potr.compatcrypto.Counter(2013))
         ciphertext = aes_encrypter.encrypt(b'setec astronomy')
 
         aes_decrypter = potr.compatcrypto.AESCTR(key, potr.compatcrypto.Counter(2013))
         self.assertEqual(aes_decrypter.decrypt(ciphertext), b'setec astronomy')
+
+    def test_getrandbits(self):
+        bits = potr.compatcrypto.getrandbits(128)
+        byts = potr.utils.long_to_bytes(bits, 16)
+        self.assertEquals(len(byts), 16)
+
+    def test_randrange(self):
+        pick = potr.compatcrypto.randrange(7, 8)
+        self.assertEqual(pick, 7)
+
+        pick = potr.compatcrypto.randrange(0, 10000)
+        self.assertGreaterEqual(pick, 0)
+        self.assertLess(pick, 10000)
