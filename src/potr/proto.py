@@ -52,7 +52,7 @@ def bytesAndStrings(cls):
     if hasByteStr:
         cls.__str__ = lambda self: self.__bytes__()
     else:
-        cls.__str__ = lambda self: str(self.__bytes__(), encoding='ascii')
+        cls.__str__ = lambda self: str(self.__bytes__(), 'utf-8', 'replace')
     return cls
 
 def registermessage(cls):
@@ -316,8 +316,11 @@ class TLV(object):
         if not data:
             return []
         typ, length, data = unpack(b'!HH', data)
-        return [tlvClasses[typ].parsePayload(data[:length])] \
-                + cls.parse(data[length:])
+        if typ in tlvClasses:
+            return [tlvClasses[typ].parsePayload(data[:length])] \
+                    + cls.parse(data[length:])
+        else:
+            raise UnknownTLV(data)
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -463,3 +466,6 @@ class ExtraKeyTLV(TLV):
     @classmethod
     def parsePayload(cls, data):
         return cls(data[:4], data[4:])
+
+class UnknownTLV(RuntimeError):
+    pass

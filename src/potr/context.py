@@ -282,7 +282,9 @@ class Context(object):
                     # TODO notify
                     msg = self.user.getDefaultQueryMessage(self.getPolicy)
                 return msg
-            if self.getPolicy('SEND_TAG') and self.tagOffer != OFFER_REJECTED:
+            if self.getPolicy('SEND_TAG') and \
+                self.tagOffer != OFFER_REJECTED and \
+                self.shouldTagMessage(msg):
                 self.tagOffer = OFFER_SENT
                 versions = set()
                 if self.getPolicy('ALLOW_V1'):
@@ -491,6 +493,10 @@ class Context(object):
             tlvs = [proto.ExtraKeyTLV(extraKeyAppId, extraKeyAppData)]
             self.sendInternal(b'', tlvs=tlvs, appdata=appdata)
         return self.crypto.extraKey
+
+    def shouldTagMessage(self, msg):
+        """Hook to decide whether to tag a message based on its contents."""
+        return True
 
 class Account(object):
     contextclass = Context
