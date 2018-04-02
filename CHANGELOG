@@ -1,3 +1,11 @@
+1.0.2 (2018-04-02)
+  - misc code cleaning (really only the beginning)
+  - initial effort towards a reasonable test coverage
+  - added a hook to allow downstream projects to selectively tag messages
+  - now raises a proper exception on unknown TLV values
+  - fixed utf decoding issues
+  - minor python 2.6 compatibility fixes
+
 1.0.1 (2014-10-16)
  - removed internal username from messages to peers
  - clear revealed macs

@@ -35,7 +35,7 @@ setup(
     package_dir={'potr':'src/potr'},
 
     name='python-potr',
-    version='1.0.2-alpha',
+    version='1.0.2',
     description='pure Python Off-The-Record encryption',
     long_description='''Python OTR
 ==========
