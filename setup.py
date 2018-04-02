@@ -63,7 +63,7 @@ issue to the `tracker <https://github.com/afflux/pure-python-otr/issues>`_.''',
     author='Kjell Braden',
     author_email='afflux@pentabarf.de',
 
-    url='http://python-otr.pentabarf.de',
+    url='https://github.com/python-otr/pure-python-otr',
 
     classifiers=[
         'Development Status :: 5 - Production/Stable',
