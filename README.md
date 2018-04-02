@@ -22,3 +22,4 @@ Reporting bugs
 ==============
 Please read the [FAQ](https://github.com/python-otr/pure-python-otr/wiki) before submitting your
 issue to the [tracker](https://github.com/python-otr/pure-python-otr/issues).
+Pull requests should be addressed to the staging branch, NOT the master branch.
