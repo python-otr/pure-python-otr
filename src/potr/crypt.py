@@ -23,7 +23,7 @@ import struct
 
 
 from potr.compatcrypto import SHA256, SHA1, SHA1HMAC, SHA256HMAC, \
-        Counter, AESCTR, PK, getrandbits, randrange
+        AESCTR, PK, getrandbits, randrange
 from potr.utils import bytes_to_long, long_to_bytes, pack_mpi, read_mpi
 from potr import proto
 

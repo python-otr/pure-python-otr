@@ -21,6 +21,7 @@ except ImportError:
   import crypto as Crypto
 
 from Crypto import Cipher
+from Crypto.Util import Counter
 from Crypto.Hash import SHA256 as _SHA256
 from Crypto.Hash import SHA as _SHA1
 from Crypto.Hash import HMAC as _HMAC
@@ -45,35 +46,13 @@ def SHA256HMAC(key, data):
 
 def AESCTR(key, counter=0):
     if isinstance(counter, Number):
-        counter = Counter(counter)
-    if not isinstance(counter, Counter):
+        counter = Counter.new(nbits=64, prefix=long_to_bytes(counter, 8), initial_value=0)
+    # in pycrypto Counter used to be an object,
+    # in pycryptodome it's now only a dict.
+    # This tries to validate its "type" so we don't feed anything as a counter
+    if set(counter) != set(Counter.new(64)):
         raise TypeError
     return Cipher.AES.new(key, Cipher.AES.MODE_CTR, counter=counter)
-
-class Counter(object):
-    def __init__(self, prefix):
-        self.prefix = prefix
-        self.val = 0
-
-    def inc(self):
-        self.prefix += 1
-        self.val = 0
-
-    def __setattr__(self, attr, val):
-        if attr == 'prefix':
-            self.val = 0
-        super(Counter, self).__setattr__(attr, val)
-
-    def __repr__(self):
-        return '<Counter(p={p!r},v={v!r})>'.format(p=self.prefix, v=self.val)
-
-    def byteprefix(self):
-        return long_to_bytes(self.prefix, 8)
-
-    def __call__(self):
-        bytesuffix = long_to_bytes(self.val, 8)
-        self.val += 1
-        return self.byteprefix() + bytesuffix
 
 @common.registerkeytype
 class DSAKey(common.PK):
