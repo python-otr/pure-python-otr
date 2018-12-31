@@ -21,7 +21,7 @@ from __future__ import unicode_literals
 import logging
 import struct
 
-from Crypto.Util import Counter
+
 from potr.compatcrypto import SHA256, SHA1, SHA1HMAC, SHA256HMAC, \
         AESCTR, PK, getrandbits, randrange
 from potr.utils import bytes_to_long, long_to_bytes, pack_mpi, read_mpi
@@ -69,8 +69,8 @@ class DHSession(object):
         self.sendmac = sendmac
         self.rcvenc = rcvenc
         self.rcvmac = rcvmac
-        self.sendctr = Counter.new(nbits=64, prefix=long_to_bytes(0, 8), initial_value=0)
-        self.rcvctr = Counter.new(nbits=64, prefix=long_to_bytes(0, 8), initial_value=0)
+        self.sendctr = Counter(0)
+        self.rcvctr = Counter(0)
         self.sendmacused = False
         self.rcvmacused = False
 
