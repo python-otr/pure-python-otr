@@ -107,8 +107,8 @@ class DSAKey(common.PK):
     @classmethod
     def generate(cls):
         privkey = DSA.generate(1024)
-        return cls((privkey.key.y, privkey.key.g, privkey.key.p, privkey.key.q,
-                privkey.key.x), private=True)
+        return cls((privkey.y, privkey.g, privkey.p, privkey.q,
+                privkey.x), private=True)
 
     @classmethod
     def parsePayload(cls, data, private=False):
