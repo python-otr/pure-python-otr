@@ -26,6 +26,7 @@ from Crypto.Hash import SHA256 as _SHA256
 from Crypto.Hash import SHA as _SHA1
 from Crypto.Hash import HMAC as _HMAC
 from Crypto.PublicKey import DSA
+from Crypto.Signature import DSS
 import Crypto.Random.random
 from numbers import Number
 
@@ -84,10 +85,9 @@ class DSAKey(common.PK):
         return SHA1(self.getSerializedPublicPayload())
 
     def sign(self, data):
-        # 2 <= K <= q
-        K = randrange(2, self.priv.q)
-        r, s = self.priv.sign(data, K)
-        return long_to_bytes(r, 20) + long_to_bytes(s, 20)
+        signer = DSS.new(self.priv, 'fips-186-3')
+        signature = signer.sign(data)
+        return signature
 
     def verify(self, data, sig):
         r, s = bytes_to_long(sig[:20]), bytes_to_long(sig[20:])
