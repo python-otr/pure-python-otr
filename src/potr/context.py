@@ -426,9 +426,9 @@ class Context(object):
         return message[indexBase:end]
 
     def parse(self, message, nofragment=False):
-        otrTagPos = message.find(proto.OTRTAG)
+        otrTagPos = message.find(str(proto.OTRTAG))
         if otrTagPos == -1:
-            if proto.MESSAGE_TAG_BASE in message:
+            if str(proto.MESSAGE_TAG_BASE) in message:
                 return proto.TaggedPlaintext.parse(message)
             else:
                 return message
