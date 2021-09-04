@@ -15,7 +15,7 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-# some python3 compatibilty
+# some python3 compatibility
 from __future__ import unicode_literals
 
 import base64

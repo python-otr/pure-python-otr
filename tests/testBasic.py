@@ -1,4 +1,4 @@
-# some python3 compatibilty
+# some python3 compatibility
 from __future__ import print_function
 from __future__ import unicode_literals
 
