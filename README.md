@@ -8,15 +8,15 @@ Install the potr Python module:
 
     sudo python setup.py install
 
-__Dependencies__: pycrypto >= 2.1 (see [dlitz/pycrypto](https://github.com/dlitz/pycrypto))
+__Dependencies__: PyCryptodome (see [Legrandin/pycryptodome](https://github.com/Legrandin/pycryptodome))
 
 This software is experimental and potentially insecure. Do not rely on it
 =========================================================================
 
 Usage Notes
 ===========
-This module uses pycrypto's RNG. If you use this package in your application and your application
-uses `os.fork()`, make sure to call `Crypto.Random.atfork()` in both the parent and the child process.
+This module uses PyCryptodome's RNG. If you use this package in your application and your application
+uses `os.fork()`, make sure to call `Cryptodome.Random.atfork()` in both the parent and the child process.
 
 Reporting bugs
 ==============

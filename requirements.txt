@@ -1,1 +1,1 @@
-PyCrypto >= 2.1
+PyCryptodome

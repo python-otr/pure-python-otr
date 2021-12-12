@@ -15,17 +15,15 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
-try:
-  import Crypto
-except ImportError:
-  import crypto as Crypto
+from Cryptodome import Cipher
+from Cryptodome.Hash import HMAC as _HMAC
+from Cryptodome.Hash import SHA256 as _SHA256
+from Cryptodome.Hash import SHA as _SHA1
+from Cryptodome.PublicKey import DSA
+from Cryptodome.Random import random
+from Cryptodome.Signature import DSS
+from Cryptodome.Util import Counter
 
-from Crypto import Cipher
-from Crypto.Hash import SHA256 as _SHA256
-from Crypto.Hash import SHA as _SHA1
-from Crypto.Hash import HMAC as _HMAC
-from Crypto.PublicKey import DSA
-import Crypto.Random.random
 from numbers import Number
 
 from potr.compatcrypto import common
@@ -45,35 +43,13 @@ def SHA256HMAC(key, data):
 
 def AESCTR(key, counter=0):
     if isinstance(counter, Number):
-        counter = Counter(counter)
-    if not isinstance(counter, Counter):
+        counter = Counter.new(nbits=64, prefix=long_to_bytes(counter, 8), initial_value=0)
+    # in pycrypto Counter used to be an object,
+    # in pycryptodome it's now only a dict.
+    # This tries to validate its "type" so we don't feed anything as a counter
+    if set(counter) != set(Counter.new(64)):
         raise TypeError
     return Cipher.AES.new(key, Cipher.AES.MODE_CTR, counter=counter)
-
-class Counter(object):
-    def __init__(self, prefix):
-        self.prefix = prefix
-        self.val = 0
-
-    def inc(self):
-        self.prefix += 1
-        self.val = 0
-
-    def __setattr__(self, attr, val):
-        if attr == 'prefix':
-            self.val = 0
-        super(Counter, self).__setattr__(attr, val)
-
-    def __repr__(self):
-        return '<Counter(p={p!r},v={v!r})>'.format(p=self.prefix, v=self.val)
-
-    def byteprefix(self):
-        return long_to_bytes(self.prefix, 8)
-
-    def __call__(self):
-        bytesuffix = long_to_bytes(self.val, 8)
-        self.val += 1
-        return self.byteprefix() + bytesuffix
 
 @common.registerkeytype
 class DSAKey(common.PK):
@@ -107,12 +83,14 @@ class DSAKey(common.PK):
     def sign(self, data):
         # 2 <= K <= q
         K = randrange(2, self.priv.q)
-        r, s = self.priv.sign(data, K)
+        M = bytes_to_long(data)
+        r, s = self.priv._sign(M, K)
         return long_to_bytes(r, 20) + long_to_bytes(s, 20)
 
     def verify(self, data, sig):
         r, s = bytes_to_long(sig[:20]), bytes_to_long(sig[20:])
-        return self.pub.verify(data, (r, s))
+        M = bytes_to_long(data)
+        return self.pub._verify(M, (r, s))
 
     def __hash__(self):
         return bytes_to_long(self.fingerprint())
@@ -128,8 +106,8 @@ class DSAKey(common.PK):
     @classmethod
     def generate(cls):
         privkey = DSA.generate(1024)
-        return cls((privkey.key.y, privkey.key.g, privkey.key.p, privkey.key.q,
-                privkey.key.x), private=True)
+        return cls((privkey.y, privkey.g, privkey.p, privkey.q,
+                privkey.x), private=True)
 
     @classmethod
     def parsePayload(cls, data, private=False):
@@ -143,7 +121,7 @@ class DSAKey(common.PK):
         return cls((y, g, p, q), private=False), data
 
 def getrandbits(k):
-    return Crypto.Random.random.getrandbits(k)
+    return random.getrandbits(k)
 
 def randrange(start, stop):
-    return Crypto.Random.random.randrange(start, stop)
+    return random.randrange(start, stop)

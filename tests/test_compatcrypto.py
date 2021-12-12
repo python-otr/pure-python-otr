@@ -64,10 +64,10 @@ class CompatCryptoTest(unittest.TestCase):
         key = potr.utils.long_to_bytes(
             potr.compatcrypto.getrandbits(128), 16)
 
-        aes_encrypter = potr.compatcrypto.AESCTR(key, potr.compatcrypto.Counter(2013))
+        aes_encrypter = potr.compatcrypto.AESCTR(key, 2013)
         ciphertext = aes_encrypter.encrypt(b'setec astronomy')
 
-        aes_decrypter = potr.compatcrypto.AESCTR(key, potr.compatcrypto.Counter(2013))
+        aes_decrypter = potr.compatcrypto.AESCTR(key, 2013)
         self.assertEqual(aes_decrypter.decrypt(ciphertext), b'setec astronomy')
 
     def test_getrandbits(self):
