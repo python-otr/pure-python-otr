@@ -15,19 +15,23 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
+
+from Cryptodome import Cipher
+from Cryptodome.Hash import HMAC as _HMAC
+from Cryptodome.Hash import SHA256 as _SHA256
+from Cryptodome.Hash import SHA as _SHA1
+from Cryptodome.PublicKey import DSA
+from Cryptodome.Random import random
+from Cryptodome.Signature import DSS
+from Cryptodome.Util import Counter
+
 try:
   import Crypto
 except ImportError:
   import crypto as Crypto
 
 from Crypto import Cipher
-from Crypto.Util import Counter
-from Crypto.Hash import SHA256 as _SHA256
-from Crypto.Hash import SHA as _SHA1
-from Crypto.Hash import HMAC as _HMAC
-from Crypto.PublicKey import DSA
-from Crypto.Signature import DSS
-import Crypto.Random.random
+
 from numbers import Number
 
 from potr.compatcrypto import common
@@ -85,13 +89,16 @@ class DSAKey(common.PK):
         return SHA1(self.getSerializedPublicPayload())
 
     def sign(self, data):
-        signer = DSS.new(self.priv, 'fips-186-3')
-        signature = signer.sign(data)
-        return signature
+        # 2 <= K <= q
+        K = randrange(2, self.priv.q)
+        M = bytes_to_long(data)
+        r, s = self.priv._sign(M, K)
+        return long_to_bytes(r, 20) + long_to_bytes(s, 20)
 
     def verify(self, data, sig):
         r, s = bytes_to_long(sig[:20]), bytes_to_long(sig[20:])
-        return self.pub.verify(data, (r, s))
+        M = bytes_to_long(data)
+        return self.pub._verify(M, (r, s))
 
     def __hash__(self):
         return bytes_to_long(self.fingerprint())
@@ -122,7 +129,7 @@ class DSAKey(common.PK):
         return cls((y, g, p, q), private=False), data
 
 def getrandbits(k):
-    return Crypto.Random.random.getrandbits(k)
+    return random.getrandbits(k)
 
 def randrange(start, stop):
-    return Crypto.Random.random.randrange(start, stop)
+    return random.randrange(start, stop)

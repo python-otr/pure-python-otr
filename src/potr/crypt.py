@@ -69,8 +69,8 @@ class DHSession(object):
         self.sendmac = sendmac
         self.rcvenc = rcvenc
         self.rcvmac = rcvmac
-        self.sendctr = Counter(0)
-        self.rcvctr = Counter(0)
+        self.sendctr = 0
+        self.rcvctr = 0
         self.sendmacused = False
         self.rcvmacused = False
 
@@ -177,12 +177,12 @@ class CryptEngine(object):
         sesskey.rcvmacused = True
 
         newCtrPrefix = bytes_to_long(msg.ctr)
-        if newCtrPrefix <= sesskey.rcvctr.prefix:
+        if newCtrPrefix <= sesskey.rcvctr:
             logger.error('CTR must increase (old %r, new %r)',
                     sesskey.rcvctr.prefix, newCtrPrefix)
             raise InvalidParameterError
 
-        sesskey.rcvctr.prefix = newCtrPrefix
+        sesskey.rcvctr = newCtrPrefix
 
         logger.debug('handle: enc={0!r} mac={1!r} ctr={2!r}' \
                 .format(sesskey.rcvenc, sesskey.rcvmac, sesskey.rcvctr))
@@ -232,7 +232,7 @@ class CryptEngine(object):
             tlvs = []
 
         sess = self.sessionkeys[1][0]
-        sess.sendctr.inc()
+        sess.sendctr += 1
 
         logger.debug('create: enc={0!r} mac={1!r} ctr={2!r}' \
                 .format(sess.sendenc, sess.sendmac, sess.sendctr))
@@ -242,7 +242,7 @@ class CryptEngine(object):
         encmsg = AESCTR(sess.sendenc, sess.sendctr).encrypt(plainBuf)
 
         msg = proto.DataMessage(flags, self.ourKeyid-1, self.theirKeyid,
-                long_to_bytes(self.ourDHKey.pub), sess.sendctr.byteprefix(),
+                long_to_bytes(self.ourDHKey.pub), long_to_bytes(sess.sendctr, 8),
                 encmsg, b'', b''.join(self.savedMacKeys))
 
         self.savedMacKeys = []
