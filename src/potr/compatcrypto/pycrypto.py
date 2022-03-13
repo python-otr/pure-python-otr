@@ -15,6 +15,7 @@
 #    You should have received a copy of the GNU Lesser General Public License
 #    along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
+
 from Cryptodome import Cipher
 from Cryptodome.Hash import HMAC as _HMAC
 from Cryptodome.Hash import SHA256 as _SHA256
@@ -23,6 +24,13 @@ from Cryptodome.PublicKey import DSA
 from Cryptodome.Random import random
 from Cryptodome.Signature import DSS
 from Cryptodome.Util import Counter
+
+try:
+  import Crypto
+except ImportError:
+  import crypto as Crypto
+
+from Crypto import Cipher
 
 from numbers import Number
 
